@@ -1,145 +1,159 @@
+#include <assert.h>
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/socket.h>
+#include <time.h>
+#include <unistd.h>
+#include "socket.h"
 
-/* This pseudoclass creates a UDP packet that listens for or send datagrams on a local port.
-   It will try to connect.  */
-
-
-void loop(int port)
+void udp_socket_assign_port (udp_socket_t *sock, uint16_t port)
 {
-  /* Create a localhost port address. */
-  if (port_number < IPPORT_RESERVED)
-    fprintf(stderr, "Warning: %d is using a port number that is reserved for standard servers.\n", port);
-
-  /* Make the address.  */
-  struct sockaddr_in name;
-  name.sin_family = AF_INET;
-  name.sin_port = htons(port);
-  name.sin_addr.s_addr = htonl(INADDR_ANY);
-
-  /* Create the socket.  */
-  int sock = 0;
-  timer_T1 = now();
-  while (sock <= 0 && quitting == FALSE)
-    {
-      if (timer_T1 > now())
-	sleep(1);
-      else
-	{
-	  sock = socket (PF_INET,
-			 SOCK_DGRAM,
-			 0 /* Default */ );
-	  if (sock < 0)
-	    {
-	      /* Some errors aren't going to get better.  */
-	      if (errno == EPROTONOSUPPORT || errno == EACCESS)
-		{
-		  /* log error here */
-		  return -1;
-		}
-	      /* Some errors might better.  Set the retry timer for 60 seconds.  */
-	      else
-		{
-		  timer_T1 = now() + 60;
-		}
-	    }
-	}
-    }
-
-  if (quitting == TRUE)
-    {
-      if (sock > 0)
-	close (sock);
-      return 0;
-    }
-
-  /* Try binding the socket to this address.  */
-  int bound = -1;
-  int timer_T1 = now();
-  while (bound < 0 && quitting == FALSE)
-    {
-      if (timer_T2 > now())
-	sleep(1);
-      else
-	{
-	  bound = bind (sock, &name, sizeof(struct sockaddr_in));
-	  if (bound < 0)
-	    {
-	      /* Most errors won't get better if retried.  */
-	      if (errno != EADDRINUSE)
-		{
-		  perror("binding socket");
-		  return -1;
-		}
-	      /* Else, set a timer and try again later.  */
-	      perror("binding socket");
-	      timer_T2 = now() + 60;
-	    }
-	}
-    }
-    
-  if (quitting == TRUE)
-    {
-      if (sock > 0)
-	close (sock);
-      return 0;
-    }
-
-  /* Socket's main loop, waiting for packets. */
-  ssize_t bytes_received = -1;
-  char buf[1500];
-  while (1)
-    {
-      struct sockaddr_in inaddr;
-      
-      bytes_received = recvfrom (sock, (void *)buf, 1500, 0 /* = read */, &inaddr, sizeof(inaddr));
-      if (bytes_received < 0)
-	{
-	  perror("reading from socket");
-	  if (errno != EINTR)
-	      return 1;
-	  if (errno == EINTR)
-	    {
-	      sleep(1);
-	      continue;
-	    }
-	}
-      else if (bytes_received > 0)
-	{
-	  /* Inaddr has the port of the source of the message.
-	     This socket is the port of the destination of the message.
-	     We package the ports and payload to the serial port queue. */
-	  enqueue_packet(ntohs(inaddr.sin_port), port, buf, bytes_received);
-	}
-    }
-
-	  
-enum udp_sock_state {
-  UDPSOCK_UNINITIALIZED = 0;
-  UDPSOCK_
-struct udp_sock
-{
-  struct sockaddr addr;
-  socklen_t addr_len;
-  int fd;
-};
-
-void func()
-{
-  struct udp_sock S;
-  memset (S, 0, sizeof(S));
+  assert (sock->state == UDP_SOCKET_UNINITIALIZED);
   
-  /* Create the socket. */
-  int S.fd = socket (PF_INET,
-			SOCK_DGRAM,
-			0 /* Default */ );
-  if (S.fd == -1)
+  if (port < IPPORT_RESERVED)
+    fprintf(stderr, "Warning: %d is a port number that is reserved for standard servers.\n", port);
+
+  memset(&(sock->name), 0, sizeof(struct sockaddr_in));
+  sock->name.sin_family = AF_INET;
+  sock->name.sin_port = htons(port);
+  sock->name.sin_addr.s_addr = htonl(INADDR_ANY);
+  sock->state = UDP_SOCKET_ADDRESS_ASSIGNED;
+}
+
+int udp_socket_try_create (udp_socket_t *sock)
+{
+  if (sock->state != UDP_SOCKET_CREATING)
+    {
+      sock->state = UDP_SOCKET_CREATING;
+      sock->creation_time = time(NULL);
+    }
+  else if (sock->creation_time > time(NULL))
+    return -1;
+
+  sock->handle = socket (PF_INET, SOCK_DGRAM, 0 /* default */ );
+  if (sock->handle < 0)
     {
       /* Some errors aren't going to get better.  */
-      if (errno == EPROTONOSUPPORT || errno == EACCESS)
-	;
-      /* Some errors might better.  Set the retry timer.  */
+      if (errno == EPROTONOSUPPORT || errno == EACCES)
+	{
+	  perror("socket create");
+	  sock->state = UDP_SOCKET_FAILED;
+	  return -1;
+	}
+      /* Some errors might better.  Set the retry timer for 60 seconds.  */
       else
 	{
-	  
+	  perror("socket create");
+	  sock->creation_time = time(NULL) + 60;
+	  return -1;
+	}
     }
+
+  sock->state = UDP_SOCKET_CREATED;
+  return 0;
+}
+
+int udp_socket_try_bind (udp_socket_t *sock)
+{
+  int bound;
   
+  if (sock->state != UDP_SOCKET_BINDING)
+    {
+      sock->state = UDP_SOCKET_BINDING;
+      sock->binding_time = time(NULL);
+    }
+  else if (sock->binding_time > time(NULL))
+    return -1;
+
+  bound = bind (sock->handle, (struct sockaddr *)&(sock->name), sizeof(struct sockaddr_in));
+  if (bound < 0)
+    {
+      /* Most errors won't get better if retried.  */
+      if (errno != EADDRINUSE)
+	{
+	  perror("binding socket");
+	  sock->state = UDP_SOCKET_FAILED;
+	  return -1;
+	}
+      /* Else, set a timer and try again later.  */
+      perror("binding socket");
+      sock->binding_time = time(NULL) + 60;
+      return -1;
+    }
+
+  sock->state = UDP_SOCKET_READY;
+  return 0;
+}
+
+int udp_socket_msgrecv(udp_socket_t *sock, pkt_queue_t **queue)
+{
+  char buf[1500];
+  struct sockaddr_in inaddr;
+  socklen_t addrlen;
+      
+  ssize_t bytes_received = recvfrom (sock->handle, (void *)buf, 1500, 0 /* = read */,
+				     (struct sockaddr *)&inaddr, &addrlen);
+  if (bytes_received < 0)
+    {
+      if (errno != EINTR && errno != EWOULDBLOCK)
+	{
+	  perror("reading socket");
+	  sock->state = UDP_SOCKET_FAILED;
+	  close(sock->handle);
+	  return -1;
+	}
+      return 0;
+    }
+  else if (bytes_received > 0)
+    {
+      /* Inaddr has the port of the source of the message.
+	 This socket is the port of the destination of the message.
+	 We package the ports and payload to the serial port queue. */
+      #if 0
+      *queue = pkt_queue_append(*queue,
+				ntohs(inaddr.sin_port),
+				ntohs(sock->name.sin_port),
+				buf,
+				bytes_received);
+      #endif
+    }
+  return 0;
+}
+
+int udp_socket_try_close(udp_socket_t *sock)
+{
+  int ret;
+
+  if (sock->state != UDP_SOCKET_CLOSING)
+    {
+      sock->state = UDP_SOCKET_CLOSING;
+      sock->closing_time = time(NULL);
+    }
+  else if (sock->closing_time > time(NULL))
+    return -1;
+
+  
+  ret = close(sock->handle);
+  if (ret < 0)
+    {
+      /* Some errors aren't going to get better.  */
+      if (errno != EINTR)
+	{
+	  perror("socket close");
+	  sock->state = UDP_SOCKET_FAILED;
+	  return -1;
+	}
+      /* Some errors might better.  Set the retry timer for 60 seconds.  */
+      else
+	{
+	  perror("socket close");
+	  sock->closing_time = time(NULL) + 60;
+	  return -1;
+	}
+    }
+
+  sock->state = UDP_SOCKET_CLOSED;
+  sock->handle = -1;
+  return 0;
+}
