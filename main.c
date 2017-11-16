@@ -6,8 +6,8 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>		/* close */
-#include "serial.h"
 
+#include "serial.h"
 #include "socket.h"
 
 #define UDP_PORT_COUNT (3)
@@ -20,7 +20,9 @@ int main()
 {
   int actions;
   int ret;
-
+  pkt_queue_t *queue = NULL;
+  serial_port_t *port = NULL;
+  
   memset (sockets, 0, sizeof(sockets));
   
   while (true)
@@ -49,7 +51,7 @@ int main()
 	      ret = udp_socket_try_bind(&sockets[i]);
 	      break;
 	    case UDP_SOCKET_READY:
-	      ret = udp_socket_msgrecv(&sockets[i], NULL);
+	      ret = udp_socket_msgrecv(&sockets[i], &queue);
 	      break;
 	    case UDP_SOCKET_CLOSING:
 	      ret = udp_socket_try_close(&sockets[i]);
@@ -62,6 +64,12 @@ int main()
 	    actions ++;
 	}
       /* Then check in on the message queue. */
+      if (queue)
+	{
+	  queue = pkt_queue_send(queue, port);
+	  actions ++;
+	  usleep(1);
+	}
 
       /* If nothing is happening, sleep for a bit. */
       if (actions == 0)

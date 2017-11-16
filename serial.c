@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <termios.h>
 #include "serial.h"
 
@@ -43,4 +44,11 @@ int speed_to_bps(speed_t speed)
     return 230400;
 
   return -1;
+}
+
+void serial_port_send (serial_port_t *port, char *str)
+{
+  printf("SENDING...\n");
+  puts(str);
+  printf("\n");
 }

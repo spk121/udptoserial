@@ -31,7 +31,7 @@ int udp_socket_try_create (udp_socket_t *sock)
   else if (sock->creation_time > time(NULL))
     return -1;
 
-  sock->handle = socket (PF_INET, SOCK_DGRAM, 0 /* default */ );
+  sock->handle = socket (PF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0 /* default */ );
   if (sock->handle < 0)
     {
       /* Some errors aren't going to get better.  */
@@ -103,20 +103,18 @@ int udp_socket_msgrecv(udp_socket_t *sock, pkt_queue_t **queue)
 	  close(sock->handle);
 	  return -1;
 	}
-      return 0;
+      return -1;
     }
   else if (bytes_received > 0)
     {
       /* Inaddr has the port of the source of the message.
 	 This socket is the port of the destination of the message.
 	 We package the ports and payload to the serial port queue. */
-      #if 0
       *queue = pkt_queue_append(*queue,
 				ntohs(inaddr.sin_port),
 				ntohs(sock->name.sin_port),
 				buf,
 				bytes_received);
-      #endif
     }
   return 0;
 }
