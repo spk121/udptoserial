@@ -1,7 +1,14 @@
 #ifndef U2S_SOCKET_H
 #define U2S_SOCKET_H
 
+#ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <WinSock2.h>
+#else
 #include <netinet/in.h>
+#endif
+
 #include "queue.h"
 
 typedef enum _udp_socket_state udp_socket_state_t;
@@ -23,12 +30,13 @@ typedef struct _udp_socket_t udp_socket_t;
 struct _udp_socket_t
 {
   udp_socket_state_t state;
-  struct sockaddr_in name;
   int handle;
   time_t creation_time;
   time_t binding_time;
   time_t closing_time;
-  
+  struct sockaddr_in name;
+
+
 };
 
 void udp_socket_assign_port (udp_socket_t *sock, uint16_t port);

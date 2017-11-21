@@ -2,10 +2,22 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <time.h>
+
+#ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <WinSock2.h>
+#include <io.h>
+#else
 #include <unistd.h>
+#include <sys/socket.h>
+#endif
+
 #include "socket.h"
+#ifdef WIN32
+static void wsock_perror(const char* str, int code);
+#endif
 
 void udp_socket_assign_port (udp_socket_t *sock, uint16_t port)
 {
@@ -23,6 +35,11 @@ void udp_socket_assign_port (udp_socket_t *sock, uint16_t port)
 
 int udp_socket_try_create (udp_socket_t *sock)
 {
+#ifdef WIN32
+	int iResult;
+	u_long iMode = 0;
+#endif
+
   if (sock->state != UDP_SOCKET_CREATING)
     {
       sock->state = UDP_SOCKET_CREATING;
@@ -31,7 +48,14 @@ int udp_socket_try_create (udp_socket_t *sock)
   else if (sock->creation_time > time(NULL))
     return -1;
 
+#ifdef WIN32
+  sock->handle = socket(PF_INET, SOCK_DGRAM, 0 /* default */);
+  iResult = ioctlsocket(sock->handle, FIONBIO, &iMode);
+  if (iResult != NO_ERROR)
+	  printf("ioctlsocket failed with error: %ld\n", iResult);
+#else
   sock->handle = socket (PF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0 /* default */ );
+#endif
   if (sock->handle < 0)
     {
       /* Some errors aren't going to get better.  */
@@ -90,20 +114,50 @@ int udp_socket_msgrecv(udp_socket_t *sock, pkt_queue_t **queue)
 {
   char buf[1500];
   struct sockaddr_in inaddr;
+#ifdef WIN32
+  int addrlen;
+  SSIZE_T bytes_received;
+#else
   socklen_t addrlen;
-      
-  ssize_t bytes_received = recvfrom (sock->handle, (void *)buf, 1500, 0 /* = read */,
+  ssize_t bytes_received;
+#endif
+
+  buf[0] = '\0';
+	  addrlen = sizeof(inaddr);
+#ifdef WIN32
+	  u_long count = 0;
+	  int ret = ioctlsocket(sock->handle, FIONREAD, &count);
+	  if (count > 0)
+	  {
+		  bytes_received = recvfrom(sock->handle, (void *)buf, 1500, 0 /* = read */,
+			  (struct sockaddr *)&inaddr, &addrlen);
+	  }
+	  else
+		  bytes_received = 0;
+#else
+  bytes_received = recvfrom (sock->handle, (void *)buf, 1500, 0 /* = read */,
 				     (struct sockaddr *)&inaddr, &addrlen);
+#endif
   if (bytes_received < 0)
     {
-      if (errno != EINTR && errno != EWOULDBLOCK)
-	{
-	  perror("reading socket");
-	  sock->state = UDP_SOCKET_FAILED;
-	  close(sock->handle);
-	  return -1;
-	}
-      return -1;
+#ifdef WIN32
+	  int Errno = WSAGetLastError();
+	  if (Errno != WSAEWOULDBLOCK)
+	  {
+		  wsock_perror("Reading socket", Errno);
+		  sock->state = UDP_SOCKET_FAILED;
+		  // _close(sock->handle);
+		  return -1;
+	  }
+#else
+	  if (errno != EINTR && Errno != EWOULDBLOCK)
+	  {
+		  perror("reading socket");
+		  sock->state = UDP_SOCKET_FAILED;
+		  close(sock->handle);
+		  return -1;
+	  }
+#endif
     }
   else if (bytes_received > 0)
     {
@@ -131,27 +185,55 @@ int udp_socket_try_close(udp_socket_t *sock)
   else if (sock->closing_time > time(NULL))
     return -1;
 
-  
+#ifdef WIN32
+  ret = _close(sock->handle);
+#else
   ret = close(sock->handle);
+#endif
   if (ret < 0)
-    {
-      /* Some errors aren't going to get better.  */
-      if (errno != EINTR)
-	{
-	  perror("socket close");
-	  sock->state = UDP_SOCKET_FAILED;
-	  return -1;
-	}
-      /* Some errors might better.  Set the retry timer for 60 seconds.  */
-      else
-	{
-	  perror("socket close");
-	  sock->closing_time = time(NULL) + 60;
-	  return -1;
-	}
-    }
+  {
+	  /* Some errors aren't going to get better.  */
+	  if (errno != EINTR)
+	  {
+		  perror("socket close");
+		  sock->state = UDP_SOCKET_FAILED;
+		  return -1;
+	  }
+	  /* Some errors might better.  Set the retry timer for 60 seconds.  */
+	  else
+	  {
+		  perror("socket close");
+		  sock->closing_time = time(NULL) + 60;
+		  return -1;
+	  }
+  }
 
   sock->state = UDP_SOCKET_CLOSED;
   sock->handle = -1;
   return 0;
 }
+
+
+#ifdef WIN32
+static void wsock_perror(const char* str, int code)
+{
+	static char msgbuf[256];
+	msgbuf[0] = L'\0';
+
+	if (code != -1)
+	{
+		FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,   // flags
+			NULL,                // lpsource
+			code,                 // message id
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),    // languageid
+			msgbuf,              // output buffer
+			256,     // size of msgbuf, bytes
+			NULL);               // va_list of arguments
+
+		if (!*msgbuf)
+			printf("error #%d", code);
+		else
+			printf("%s\n", msgbuf);
+	}
+}
+#endif

@@ -54,10 +54,12 @@ unsigned char * base64_encode(const unsigned char *src, size_t len,
 		*pos++ = base64_table[in[2] & 0x3f];
 		in += 3;
 		line_len += 4;
+#if 0
 		if (line_len >= 72) {
 			*pos++ = '\n';
 			line_len = 0;
 		}
+#endif
 	}
 
 	if (end - in) {
@@ -73,9 +75,10 @@ unsigned char * base64_encode(const unsigned char *src, size_t len,
 		*pos++ = '=';
 		line_len += 4;
 	}
-
+#if 0
 	if (line_len)
 		*pos++ = '\n';
+#endif
 
 	*pos = '\0';
 	if (out_len)

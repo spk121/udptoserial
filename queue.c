@@ -1,4 +1,9 @@
+#ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#else
 #include <sys/time.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -6,9 +11,38 @@
 #include "queue.h"
 #include "base64.h"
 
-static unsigned short crc16(const unsigned char* data_p, unsigned char length);
+static unsigned short crc16(const unsigned char* data_p, int length);
 
 /* This is a queue of packets to be sent down the serial pipe. */
+
+static int64_t get_time_now_usec()
+{
+#ifdef WIN32
+	SYSTEMTIME tval;
+	FILETIME ftval;
+	ULARGE_INTEGER uftval;
+#else
+	struct timeval tval;
+#endif
+
+#ifdef WIN32
+	GetSystemTime(&tval);
+	SystemTimeToFileTime(&tval, &ftval);
+	uftval.HighPart = ftval.dwHighDateTime;
+	uftval.LowPart = ftval.dwLowDateTime;
+	/* Convert to microseconds. */
+	return (int64_t) uftval.QuadPart / 10LL;
+#else
+	if (gettimeofday(&tval, NULL) < 0)
+	{
+		perror("gettimeofday");
+		return -1;
+	}
+	else
+		return (int64_t)tval.tv_sec * 1000000LL + (int64_t)tval.tv_usec;
+#endif
+
+}
 
 /* Append new packet information to the end of the packet queue. */
 pkt_queue_t *pkt_queue_append(pkt_queue_t *queue,
@@ -16,19 +50,14 @@ pkt_queue_t *pkt_queue_append(pkt_queue_t *queue,
 {
   pkt_queue_t *new_queue;
   pkt_queue_t *last;
-  struct timeval tval;
   
   new_queue = (pkt_queue_t *) malloc(sizeof(pkt_queue_t));
-  if (gettimeofday (&tval, NULL) < 0)
-    {
-      perror("gettimeofday");
-      new_queue->timestamp = -1;
-    }
-  else
-    new_queue->timestamp = (int64_t) tval.tv_sec * 1000000LL + (int64_t) tval.tv_usec;
+  new_queue->timestamp = get_time_now_usec();
   new_queue->source = source;
   new_queue->dest = dest;
+  new_queue->data = (char *)malloc(len + 1);
   memcpy(new_queue->data, payload, len);
+  new_queue->data[len] = '\0';
   new_queue->len = len;
   new_queue->next = NULL;
 
@@ -63,17 +92,9 @@ pkt_queue_t *pkt_queue_prepend(pkt_queue_t *queue,
 			    uint16_t source, uint16_t dest, char *payload, size_t len)
 {
   pkt_queue_t *new_queue;
-  struct timeval tval;
-  
-  new_queue = (pkt_queue_t *) malloc(sizeof(pkt_queue_t));
-  if (gettimeofday (&tval, NULL) < 0)
-    {
-      perror("gettimeofday");
-      new_queue->timestamp = -1;
-    }
-  else
-    new_queue->timestamp = (int64_t) tval.tv_sec * 1000000LL + (int64_t) tval.tv_usec;
 
+  new_queue = (pkt_queue_t *)malloc(sizeof(pkt_queue_t));
+  new_queue->timestamp = get_time_now_usec();
   new_queue->source = source;
   new_queue->dest = dest;
   memcpy(new_queue->data, payload, len);
@@ -150,24 +171,25 @@ size_t pkt_estimated_string_length (pkt_queue_t *queue)
 
 pkt_queue_t *pkt_queue_send (pkt_queue_t *queue, serial_port_t *port)
 {
-  if (port == NULL)
-    return queue;
-
   if (queue == NULL)
     return NULL;
 
-  struct timeval tval;
-  gettimeofday (&tval, NULL);
-  int64_t time_now = (int64_t) tval.tv_sec * 1000000LL + (int64_t) tval.tv_usec;
+  int64_t time_now = get_time_now_usec();
 
-  if ( ((time_now - queue->timestamp) * 1000000 * port->bps) < (int64_t) pkt_estimated_string_length (queue))
-    {
-      /* Delay sending packet to avoid flooding the port. */
-      return queue;
-    }
+  if (port)
+  {
+	  if (((time_now - queue->timestamp) * 1000000 * port->bps) < (int64_t)pkt_estimated_string_length(queue))
+	  {
+		  /* Delay sending packet to avoid flooding the port. */
+		  return queue;
+	  }
+  }
 
   char *str = pkt_stringify (queue);
-  serial_port_send (port, str);
+  if (port == NULL)
+	  printf("PACKET BEGIN:\n%s\nPACKET END\n", str);
+  else
+	serial_port_send (port, str);
   free (str);
   return pkt_queue_remove_first (queue);
 }
@@ -177,33 +199,37 @@ char *pkt_stringify (pkt_queue_t *queue)
   size_t payload_str_len;
   char *payload_str = base64_encode(queue->data, queue->len, &payload_str_len);
   
-  size_t str_len = payload_str_len + 16;
+  size_t str_len = payload_str_len
+	  + 2 /* brackets */
+	  + 4 /* separators */
+	  + 3 * 5 /* 16-bit numbers as ascii */
+	  + 4 /* 16-bit number as hex */
+	  + 2 /* CRLF */
+	  ;
   
   char *str = (char *) malloc (str_len + 1);
   str[0] = '\0';
 
   /* The packet begins with a SOH character. */
   snprintf (str, str_len,
-	    "%c%04x%04x%c%s%c",
-	    '\1', 		/* start of header */
+	    "[%d:%d:%d:%s:",
 	    queue->source,
 	    queue->dest,
-	    '\2',		/* start of text */
-	    payload_str,
-	    '\3'		/* end of text */
+	  strlen(payload_str),
+	    payload_str
 	    );
   free (payload_str);
 
   /* Compute a CRC on the string so far. */
   unsigned short crc = crc16 (str, strlen(str));
-  char crcbuf[5];
-  sprintf(crcbuf, "%04x", crc);
+  char crcbuf[8];
+  sprintf(crcbuf, "%04x]\r\n", crc);
   strncat (str, crcbuf, str_len);
 
   return str;
 }
 
-static unsigned short crc16(const unsigned char* data_p, unsigned char length)
+static unsigned short crc16(const unsigned char* data_p, int length)
 {
     unsigned char x;
     unsigned short crc = 0xFFFF;

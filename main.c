@@ -4,8 +4,15 @@
 #include <stdbool.h>
 #include <stdlib.h>		/* exit */
 #include <string.h>
+
+#ifdef WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#pragma comment(lib, "Ws2_32.lib")
+#else
 #include <termios.h>
 #include <unistd.h>		/* close */
+#endif
 
 #include "serial.h"
 #include "socket.h"
@@ -22,8 +29,21 @@ int main()
   int ret;
   pkt_queue_t *queue = NULL;
   serial_port_t *port = NULL;
+#ifdef WIN32
+  WSADATA wsaData;
+  int iResult;
+  u_long iMode = 0;
+#endif
+
+#ifdef WIN32
+  iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+  if (iResult != NO_ERROR)
+	  printf("Error at WSAStartup()\n");
+  port = serial_port_new("COM3");
+#endif
   
   memset (sockets, 0, sizeof(sockets));
+
   
   while (true)
     {
@@ -68,12 +88,29 @@ int main()
 	{
 	  queue = pkt_queue_send(queue, port);
 	  actions ++;
+#ifdef WIN32
+	  Sleep(1);
+#else
 	  usleep(1);
+#endif
 	}
 
+	  /* Read all the input waiting on the serial port. */
+	  /* If there are no message delimiters in the input, but, the input
+	     is very large, dump the input. */
+	  /* If there are message delimiters in the input, try to parse a message from
+	     the input. */
+	  /* If the message is valid and it is addressed from a port we have open, send it
+	     out.*/
+
       /* If nothing is happening, sleep for a bit. */
-      if (actions == 0)
-	usleep(1000);
+#ifdef WIN32
+	  if (actions == 0)
+		  Sleep(1);
+#else
+	  if (actions == 0)
+		  usleep(1000);
+#endif
     }
   return 0;
 }
