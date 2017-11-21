@@ -1,26 +1,67 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #else
 #include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
 #endif
 #include "serial.h"
 
 #ifdef WIN32
+static serial_port_t *serial_port_new_win32(const char *port_name);
 static void serial_perror(const char* str, int code);
+#else
+static serial_port_t *serial_port_new_linux(const char *port_name);
+static void serial_port_send_linux(const serial_port_t *sp, const char *buf, size_t len);
 #endif
 
+/* Open a serial port and find its output baud rate. */
 serial_port_t *serial_port_new(const char *port_name)
 {
-	serial_port_t *sp = (serial_port_t *)malloc(sizeof(serial_port_t));
 #ifdef WIN32
+	return serial_port_new_win32(port_name);
+#else
+	return serial_port_new_linux(port_name);
+#endif
+}
+
+void serial_port_info(const serial_port_t *sp)
+{
+	if (sp == NULL)
+	{
+		printf("NO SERIAL PORT\n");
+		return;
+	}
+
+	printf("Serial port %s\n", sp->ttyname);
+	printf("    Baud rate = %d\n", sp->baud_rate);
+	printf("    Byte size = %d\n", sp->byte_size);
+	printf("    Stop bits = %d\n", sp->stop_bits);
+	if (sp->parity == NOPARITY)
+		printf("    Parity = NONE\n");
+	else if (sp->parity == EVENPARITY)
+		printf("    Parity = EVEN\n");
+	else if (sp->parity == ODDPARITY)
+		printf("    Parity = ODD\n");
+}
+
+#ifdef WIN32
+static serial_port_t *serial_port_new_win32(const char *port_name)
+{
+	serial_port_t *sp;
 	HANDLE h_serial;
 	BOOL Status;
 
-	h_serial = CreateFile(port_name,
+	sp = (serial_port_t *)malloc(sizeof(serial_port_t));
+	memset(sp, 0, sizeof(serial_port_t));
+
+	sp->handle = CreateFile(port_name,
 		GENERIC_READ | GENERIC_WRITE,
 		0,
 		0,
@@ -109,12 +150,123 @@ serial_port_t *serial_port_new(const char *port_name)
 		printf("\n\n   Setting Serial Port Timeouts Successfull");
 #endif
 
-#else
-#endif
 	sp->bps = dcbSerialParams.BaudRate;
 	sp->handle = h_serial;
 	return sp;
 }
+#endif
+
+#ifndef WIN32
+static char *make_full_port_name_linux(const char* port_name)
+{
+	char *full_port_name = NULL;
+	if (port_name == NULL || strlen(port_name) == 0)
+	{
+		/* No port name was given, so try this default. */
+		full_port_name = strdup("/dev/ttyS1");
+	}
+	else if (port_name[0] == '/')
+	{
+		/* Assume this already is a full port name. */
+		full_port_name = strdup(port_name);
+	}
+	else if (strlen(port_name) == 1 || isdigit(port_name[0]))
+	{
+		/* If it is just a number, try it as a ttyS style port. */
+		full_port_name = strdup("/dev/ttyS0");
+		full_port_name[9] = port_name[0];
+	}
+	else
+	{
+		full_port_name = (char *) malloc (strlen(port_name) + 5);
+		/* Eh, try this. */
+		strncpy(full_port_name, "/dev/", 5);
+		strncpy(full_port_name + 5, port_name, strlen(port_name));
+	}
+	return full_port_name;
+}
+
+serial_port_t *serial_port_new_linux(const char *port_name)
+{
+	char *full_port_name = NULL;
+	serial_port_t *sp = NULL;
+	struct termios tinfo;
+	#define TTY_NAME_MAX_LEN_LINUX 13
+   	char tty_name_buf[TTY_NAME_MAX_LEN_LINUX];
+
+	sp = (serial_port_t *)malloc(sizeof(serial_port_t));
+	memset (sp, 0, sizeof(serial_port_t));
+	memset (&tinfo, 0, sizeof(tinfo));
+
+	/* Create a fully qualified port name, such as "/dev/ttyS0". */
+	full_port_name = make_full_port_name_linux(port_name);
+	sp->handle = open(full_port_name, O_RDWR | O_NOCTTY);
+	free (full_port_name);
+
+  	if (sp->handle == -1 || isatty(sp->handle) != 1)
+    {
+		perror("Opening serial port");
+		free (sp);
+		return NULL;	
+    }
+
+	/* OK, we've opened a TTY. */
+	/* Longest TTY name on Linux is 12 bytes "/dev/ttyS99" */	
+    if (ttyname_r(sp->handle, tty_name_buf, TTY_NAME_MAX_LEN_LINUX) != 0)
+	{
+		perror("Get tty name");
+		goto err_tty;
+	}
+	sp->ttyname = strdup(tty_name_buf);
+
+	if (tcgetattr(sp->handle, &tinfo) == -1)
+	{
+		perror("get serial port attributes");
+		goto err_tty;
+	}
+    
+    /* Put the serial port info into raw mode. */
+    cfmakeraw(&tinfo);
+	if (tcsetattr (sp->handle, TCSANOW, &tinfo) < 0)
+	{
+		perror("set serial port to raw mode");
+		goto err_tty;
+	}
+
+	/* Gather serial port information. */
+	sp->baud_rate = speed_to_bps(cfgetospeed(&tinfo));
+	if ((tinfo.c_cflag & CSIZE) == CS5)
+		sp->byte_size = 5;
+	else if ((tinfo.c_cflag & CSIZE) == CS6)
+		sp->byte_size = 6;
+	else if ((tinfo.c_cflag & CSIZE) == CS7)
+		sp->byte_size = 7;
+	else if ((tinfo.c_cflag & CSIZE) == CS8)
+		sp->byte_size = 8;
+	if (tinfo.c_cflag & CSTOPB)
+		sp->stop_bits = 2;
+	else
+		sp->stop_bits = 1;
+	if ((tinfo.c_cflag & PARENB) == 0)
+		sp->parity = NOPARITY;
+	else if ((tinfo.c_cflag & PARENB) && (tinfo.c_cflag & PARODD))
+		sp->parity = ODDPARITY;
+	else
+		sp->parity = EVENPARITY;
+  
+	return sp;	
+
+err_tty:
+	if (sp)
+	{
+		free (sp->ttyname);
+		if (sp->handle > 0)
+			close (sp->handle);
+	}
+	free (sp);
+	return NULL;
+}
+#endif
 
 #ifdef WIN32
 int speed_to_bps(DWORD speed)
@@ -167,7 +319,41 @@ int speed_to_bps(speed_t speed)
 }
 #endif
 
-void serial_port_send(serial_port_t *port, char *lpBuffer)
+void serial_port_send(const serial_port_t *sp, const char *buf, size_t len)
+{
+#ifdef WIN32
+	serial_port_send_win32(port, buf, len);
+#else
+	serial_port_send_linux(sp, buf, len);
+#endif
+}
+
+#ifndef WIN32
+static void serial_port_send_linux(const serial_port_t *sp, const char *buf, size_t len)
+{
+	ssize_t bytes_written;
+
+	/* Write the specified number of bytes to the serial port. */
+	if (sp == NULL)
+	{
+		printf("NO SERIAL PORT...\n");
+		for (size_t i = 0; i < len; i ++)
+			putc(buf[i], stdout);
+		printf("\n");
+	}
+	else
+	{
+		bytes_written = write (sp->handle, buf, len);
+		if (bytes_written < 0)
+		{
+			perror ("Writing to serial port");
+		}
+	}
+}
+#endif
+
+#ifdef WIN32
+void serial_port_send_win32(const serial_port_t *sp, const char *buf, size_t len)
 {
 	if (port == NULL)
 	{
@@ -251,6 +437,7 @@ void serial_port_send(serial_port_t *port, char *lpBuffer)
 		}
 	}
 }
+#endif
 
 #ifdef WIN32
 static void serial_perror(const char* str, int code)

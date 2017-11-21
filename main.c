@@ -40,8 +40,11 @@ int main()
   if (iResult != NO_ERROR)
 	  printf("Error at WSAStartup()\n");
   port = serial_port_new("COM3");
+#else
+	port = serial_port_new("ttyS1");
 #endif
-  
+	serial_port_info(port);
+	
   memset (sockets, 0, sizeof(sockets));
 
   

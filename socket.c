@@ -150,7 +150,7 @@ int udp_socket_msgrecv(udp_socket_t *sock, pkt_queue_t **queue)
 		  return -1;
 	  }
 #else
-	  if (errno != EINTR && Errno != EWOULDBLOCK)
+	  if (errno != EINTR && errno != EWOULDBLOCK)
 	  {
 		  perror("reading socket");
 		  sock->state = UDP_SOCKET_FAILED;

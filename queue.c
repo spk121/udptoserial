@@ -178,7 +178,7 @@ pkt_queue_t *pkt_queue_send (pkt_queue_t *queue, serial_port_t *port)
 
   if (port)
   {
-	  if (((time_now - queue->timestamp) * 1000000 * port->bps) < (int64_t)pkt_estimated_string_length(queue))
+	  if (((time_now - queue->timestamp) * 1000000 * port->baud_rate) < (int64_t)pkt_estimated_string_length(queue))
 	  {
 		  /* Delay sending packet to avoid flooding the port. */
 		  return queue;
@@ -186,10 +186,7 @@ pkt_queue_t *pkt_queue_send (pkt_queue_t *queue, serial_port_t *port)
   }
 
   char *str = pkt_stringify (queue);
-  if (port == NULL)
-	  printf("PACKET BEGIN:\n%s\nPACKET END\n", str);
-  else
-	serial_port_send (port, str);
+  serial_port_send (port, str, strlen(str));
   free (str);
   return pkt_queue_remove_first (queue);
 }
