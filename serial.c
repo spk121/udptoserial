@@ -43,11 +43,11 @@ void serial_port_info(const serial_port_t *sp)
 	printf("    Baud rate = %d\n", sp->baud_rate);
 	printf("    Byte size = %d\n", sp->byte_size);
 	printf("    Stop bits = %d\n", sp->stop_bits);
-	if (sp->parity == NOPARITY)
+	if (sp->parity == SP_NOPARITY)
 		printf("    Parity = NONE\n");
-	else if (sp->parity == EVENPARITY)
+	else if (sp->parity == SP_EVENPARITY)
 		printf("    Parity = EVEN\n");
-	else if (sp->parity == ODDPARITY)
+	else if (sp->parity == SP_ODDPARITY)
 		printf("    Parity = ODD\n");
 }
 
@@ -61,7 +61,7 @@ static serial_port_t *serial_port_new_win32(const char *port_name)
 	sp = (serial_port_t *)malloc(sizeof(serial_port_t));
 	memset(sp, 0, sizeof(serial_port_t));
 
-	sp->handle = CreateFile(port_name,
+	h_serial = CreateFile(port_name,
 		GENERIC_READ | GENERIC_WRITE,
 		0,
 		0,
@@ -149,9 +149,20 @@ static serial_port_t *serial_port_new_win32(const char *port_name)
 	else
 		printf("\n\n   Setting Serial Port Timeouts Successfull");
 #endif
-
-	sp->bps = dcbSerialParams.BaudRate;
+	sp->baud_rate = dcbSerialParams.BaudRate;
+	sp->byte_size = dcbSerialParams.ByteSize;
 	sp->handle = h_serial;
+	if (dcbSerialParams.Parity == 0)
+		sp->parity = SP_NOPARITY;
+	if (dcbSerialParams.Parity == 1)
+		sp->parity = SP_ODDPARITY;
+	if (dcbSerialParams.Parity == 2)
+		sp->parity = SP_EVENPARITY;
+	if (dcbSerialParams.StopBits == 0)
+		sp->stop_bits = 1;
+	if (dcbSerialParams.StopBits == 2)
+		sp->stop_bits = 2;
+	sp->ttyname = strdup(port_name);
 	return sp;
 }
 #endif
@@ -248,11 +259,11 @@ serial_port_t *serial_port_new_linux(const char *port_name)
 	else
 		sp->stop_bits = 1;
 	if ((tinfo.c_cflag & PARENB) == 0)
-		sp->parity = NOPARITY;
+		sp->parity = SP_NOPARITY;
 	else if ((tinfo.c_cflag & PARENB) && (tinfo.c_cflag & PARODD))
-		sp->parity = ODDPARITY;
+		sp->parity = SP_ODDPARITY;
 	else
-		sp->parity = EVENPARITY;
+		sp->parity = SP_EVENPARITY;
   
 	return sp;	
 
@@ -319,16 +330,90 @@ int speed_to_bps(speed_t speed)
 }
 #endif
 
-void serial_port_send(const serial_port_t *sp, const char *buf, size_t len)
-{
 #ifdef WIN32
-	serial_port_send_win32(port, buf, len);
-#else
-	serial_port_send_linux(sp, buf, len);
+static void serial_port_send_win32(const serial_port_t *sp, const char *buf, size_t len)
+{
+	DWORD  dNoOFBytestoWrite = len;              // No of bytes to write into the port
+	DWORD  dNoOfBytesWritten = 0;          // No of bytes written to the port
+	DWORD Status;
+
+	if (sp == NULL)
+	{
+		printf("NO SERIAL PORT...\n");
+		for (size_t i = 0; i < len; i++)
+			putc(buf[i], stdout);
+		printf("\n");
+	}
+	else
+	{
+
+		Status = WriteFile(sp->handle,               // Handle to the Serialport
+			buf,            // Data to be written to the port 
+			dNoOFBytestoWrite,   // No of bytes to write into the port
+			&dNoOfBytesWritten,  // No of bytes written to the port
+			NULL);
+
+		if (Status != TRUE)
+		{
+			COMSTAT comStat;
+			DWORD   dwErrors;
+			BOOL    fOOP, fOVERRUN, fPTO, fRXOVER, fRXPARITY, fTXFULL;
+			BOOL    fBREAK, fDNS, fFRAME, fIOE, fMODE;
+
+			serial_perror("serial_port_send()", GetLastError());
+
+			// Get and clear current errors on the port.
+			if (!ClearCommError(sp->handle, &dwErrors, &comStat))
+				// Report error in ClearCommError.
+				return;
+
+			// Get error flags.
+			fDNS = dwErrors & CE_DNS;
+			fIOE = dwErrors & CE_IOE;
+			fOOP = dwErrors & CE_OOP;
+			fPTO = dwErrors & CE_PTO;
+			fMODE = dwErrors & CE_MODE;
+			fBREAK = dwErrors & CE_BREAK;
+			fFRAME = dwErrors & CE_FRAME;
+			fRXOVER = dwErrors & CE_RXOVER;
+			fTXFULL = dwErrors & CE_TXFULL;
+			fOVERRUN = dwErrors & CE_OVERRUN;
+			fRXPARITY = dwErrors & CE_RXPARITY;
+		}
+	}
+
+#if 0
+	// COMSTAT structure contains information regarding
+	// communications status.
+	if (comStat.fCtsHold)
+		// Tx waiting for CTS signal
+
+		if (comStat.fDsrHold)
+			// Tx waiting for DSR signal
+
+			if (comStat.fRlsdHold)
+				// Tx waiting for RLSD signal
+
+				if (comStat.fXoffHold)
+					// Tx waiting, XOFF char rec'd
+
+					if (comStat.fXoffSent)
+						// Tx waiting, XOFF char sent
+
+						if (comStat.fEof)
+							// EOF character received
+
+							if (comStat.fTxim)
+								// Character waiting for Tx; char queued with TransmitCommChar
+
+								if (comStat.cbInQue)
+									// comStat.cbInQue bytes have been received, but not read
+
+									if (comStat.cbOutQue)
+										// comStat.cbOutQue bytes are awaiting transfer
 #endif
 }
-
-#ifndef WIN32
+#else
 static void serial_port_send_linux(const serial_port_t *sp, const char *buf, size_t len)
 {
 	ssize_t bytes_written;
@@ -347,93 +432,6 @@ static void serial_port_send_linux(const serial_port_t *sp, const char *buf, siz
 		if (bytes_written < 0)
 		{
 			perror ("Writing to serial port");
-		}
-	}
-}
-#endif
-
-#ifdef WIN32
-void serial_port_send_win32(const serial_port_t *sp, const char *buf, size_t len)
-{
-	if (port == NULL)
-	{
-		printf("NO SERIAL PORT...\n");
-		puts(lpBuffer);
-		printf("\n");
-	}
-	else
-	{
-		DWORD  dNoOFBytestoWrite;              // No of bytes to write into the port
-		DWORD  dNoOfBytesWritten = 0;          // No of bytes written to the port
-		DWORD Status;
-
-		dNoOFBytestoWrite = strlen(lpBuffer); // Calculating the no of bytes to write into the port
-
-		Status = WriteFile(port->handle,               // Handle to the Serialport
-			lpBuffer,            // Data to be written to the port 
-			dNoOFBytestoWrite,   // No of bytes to write into the port
-			&dNoOfBytesWritten,  // No of bytes written to the port
-			NULL);
-
-		if (Status == TRUE)
-			printf("\n\n    %s - Written to port", lpBuffer);
-		else
-		{
-			COMSTAT comStat;
-			DWORD   dwErrors;
-			BOOL    fOOP, fOVERRUN, fPTO, fRXOVER, fRXPARITY, fTXFULL;
-			BOOL    fBREAK, fDNS, fFRAME, fIOE, fMODE;
-
-			serial_perror("serial_port_send()", GetLastError());
-
-			// Get and clear current errors on the port.
-			if (!ClearCommError(port->handle, &dwErrors, &comStat))
-				// Report error in ClearCommError.
-				return;
-
-			// Get error flags.
-			fDNS = dwErrors & CE_DNS;
-			fIOE = dwErrors & CE_IOE;
-			fOOP = dwErrors & CE_OOP;
-			fPTO = dwErrors & CE_PTO;
-			fMODE = dwErrors & CE_MODE;
-			fBREAK = dwErrors & CE_BREAK;
-			fFRAME = dwErrors & CE_FRAME;
-			fRXOVER = dwErrors & CE_RXOVER;
-			fTXFULL = dwErrors & CE_TXFULL;
-			fOVERRUN = dwErrors & CE_OVERRUN;
-			fRXPARITY = dwErrors & CE_RXPARITY;
-
-#if 0
-			// COMSTAT structure contains information regarding
-			// communications status.
-			if (comStat.fCtsHold)
-				// Tx waiting for CTS signal
-
-				if (comStat.fDsrHold)
-					// Tx waiting for DSR signal
-
-					if (comStat.fRlsdHold)
-						// Tx waiting for RLSD signal
-
-						if (comStat.fXoffHold)
-							// Tx waiting, XOFF char rec'd
-
-							if (comStat.fXoffSent)
-								// Tx waiting, XOFF char sent
-
-								if (comStat.fEof)
-									// EOF character received
-
-									if (comStat.fTxim)
-										// Character waiting for Tx; char queued with TransmitCommChar
-
-										if (comStat.cbInQue)
-											// comStat.cbInQue bytes have been received, but not read
-
-											if (comStat.cbOutQue)
-												// comStat.cbOutQue bytes are awaiting transfer
-#endif
 		}
 	}
 }
@@ -462,3 +460,13 @@ static void serial_perror(const char* str, int code)
 	}
 }
 #endif
+
+void serial_port_send(const serial_port_t *sp, const char *buf, size_t len)
+{
+#ifdef WIN32
+	serial_port_send_win32(sp, buf, len);
+#else
+	serial_port_send_linux(sp, buf, len);
+#endif
+}
+

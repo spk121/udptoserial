@@ -10,6 +10,7 @@
 
 #include "queue.h"
 #include "base64.h"
+#include "parser.h"
 
 static unsigned short crc16(const unsigned char* data_p, int length);
 
@@ -169,6 +170,8 @@ size_t pkt_estimated_string_length (pkt_queue_t *queue)
 	  + queue->len * 4 / 3);	/* Base64 packed payload */
 }
 
+char sendbuf[70000];
+
 pkt_queue_t *pkt_queue_send (pkt_queue_t *queue, serial_port_t *port)
 {
   if (queue == NULL)
@@ -185,60 +188,16 @@ pkt_queue_t *pkt_queue_send (pkt_queue_t *queue, serial_port_t *port)
 	  }
   }
 
-  char *str = pkt_stringify (queue);
-  serial_port_send (port, str, strlen(str));
-  free (str);
+  unpacked_msg_t msg;
+  msg.protocol = MSG_PROTOCOL_UDP;
+  msg.input_port = queue->source;
+  msg.output_port = queue->dest;
+  msg.data = queue->data;
+  msg.len = queue->len;
+  msg.valid = true;
+
+  size_t ret = pack_message(&msg, sendbuf, 70000);
+  serial_port_send (port, sendbuf, strlen(sendbuf));
   return pkt_queue_remove_first (queue);
 }
 
-char *pkt_stringify (pkt_queue_t *queue)
-{
-  size_t payload_str_len;
-  char *payload_str = base64_encode(queue->data, queue->len, &payload_str_len);
-  
-  size_t str_len = payload_str_len
-	  + 2 /* brackets */
-	  + 4 /* separators */
-	  + 3 * 5 /* 16-bit numbers as ascii */
-	  + 4 /* 16-bit number as hex */
-	  + 2 /* CRLF */
-	  ;
-  
-  char *str = (char *) malloc (str_len + 1);
-  str[0] = '\0';
-
-  /* The packet begins with a SOH character. */
-  snprintf (str, str_len,
-	    "[%d:%d:%d:%s:",
-	    queue->source,
-	    queue->dest,
-	  strlen(payload_str),
-	    payload_str
-	    );
-  free (payload_str);
-
-  /* Compute a CRC on the string so far. */
-  unsigned short crc = crc16 (str, strlen(str));
-  char crcbuf[8];
-  sprintf(crcbuf, "%04x]\r\n", crc);
-  strncat (str, crcbuf, str_len);
-
-  return str;
-}
-
-static unsigned short crc16(const unsigned char* data_p, int length)
-{
-    unsigned char x;
-    unsigned short crc = 0xFFFF;
-
-    while (length--){
-        x = crc >> 8 ^ *data_p++;
-        x ^= x>>4;
-        crc = (crc << 8) ^ ((unsigned short)(x << 12)) ^ ((unsigned short)(x <<5)) ^ ((unsigned short)x);
-    }
-    return crc;
-}
-
-
-
-  

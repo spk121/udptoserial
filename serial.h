@@ -13,9 +13,9 @@ typedef enum _serial_port_parity_t serial_port_parity_t;
 
 enum _serial_port_parity_t
 {
-  NOPARITY,
-  ODDPARITY,
-  EVENPARITY
+  SP_NOPARITY,
+  SP_ODDPARITY,
+  SP_EVENPARITY
 };
 
 typedef struct _serial_port_t serial_port_t;
