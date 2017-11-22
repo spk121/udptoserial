@@ -1,0 +1,20 @@
+
+
+There are a couple of relevant IETF RFCs
+
+768 User Datagram Protocol
+
+1050 Serial Line IP (SLIP protocol)
+
+2508 Compressing IP/UDP/RTP Headers for Low-Speed Serial Links. S.
+     Casner, V. Jacobson. February 1999. (Format: TXT=60474 bytes)
+     (Status: PROPOSED STANDARD) (DOI: 10.17487/RFC2508) 
+
+6935 IPv6 and UDP Checksums for Tunneled Packets. M. Eubanks, P.
+     Chimento, M. Westerlund. April 2013. (Format: TXT=29055 bytes)
+     (Updates RFC2460) (Status: PROPOSED STANDARD) (DOI:
+     10.17487/RFC6935)
+
+8085 UDP Usage Guidelines. L. Eggert, G. Fairhurst, G. Shepherd. March
+     2017. (Format: TXT=145359 bytes) (Obsoletes RFC5405) (Also BCP0145)
+     (Status: BEST CURRENT PRACTICE) (DOI: 10.17487/RFC8085)
