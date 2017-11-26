@@ -61,7 +61,7 @@ static serial_port_t *serial_port_new_win32(const char *port_name)
 	sp = (serial_port_t *)malloc(sizeof(serial_port_t));
 	memset(sp, 0, sizeof(serial_port_t));
 
-	h_serial = CreateFile(port_name,
+	h_serial = CreateFileA(port_name,
 		GENERIC_READ | GENERIC_WRITE,
 		0,
 		0,
@@ -162,7 +162,7 @@ static serial_port_t *serial_port_new_win32(const char *port_name)
 		sp->stop_bits = 1;
 	if (dcbSerialParams.StopBits == 2)
 		sp->stop_bits = 2;
-	sp->ttyname = strdup(port_name);
+	sp->ttyname = _strdup(port_name);
 	return sp;
 }
 #endif
