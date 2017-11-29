@@ -1,4 +1,10 @@
-#define BOOST_LOG_DYN_LINK
+#ifdef WIN32
+// When I build Boost in the standard way on Win32, I get DLLs.
+#else
+// #define BOOST_LOG_DYN_LINK
+#endif
+// #define BOOST_ALL_DYN_LINK
+
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>

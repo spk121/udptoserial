@@ -1,0 +1,28 @@
+So I installed boost onto my windows box.  I did the default configuration
+
+bootstrap.bat
+.\b2 --build-dir="c:\Program Files\boost\tmp"
+
+On completion it said this
+
+
+The Boost C++ Libraries were successfully built!
+
+The following directory should be added to compiler include paths:
+
+    C:\Program Files\boost\boost_1_65_1
+
+The following directory should be added to linker library paths:
+
+    C:\Program Files\boost\boost_1_65_1\stage\lib
+
+
+
+I finally got a sample log program to build using
+cl /EHsc /Zi /MD /I "c:\Program Files\boost\boost_1_65_1" logtest.cpp /link /LIBPATH:"C:\program files\boost\boost_1_65_1\stage\lib" libboost_log-vc141-mt-1_65_1.lib
+
+/Z1 is debug
+/MD is dynamic linking to standard libraries
+
+
+On windows, I had now luck with the automatic linking, so I didn't #define BOOST_LOG_DYN_LINK or BOOST_ALL_DYN_LINK
