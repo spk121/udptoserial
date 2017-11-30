@@ -7,13 +7,13 @@ Udp_ports::Udp_ports()
 	hostent* localHost;
 
 	localHost = gethostbyname("");
-	localIP = inet_ntoa(*(struct in_addr *)*localHost->h_addr_list);
+	//localIP = inet_ntoa(*(struct in_addr *)*localHost->h_addr_list);
 }
 
 Udp_ports::Udp_ports(std::string _local_ip, std::string _remote_ip, std::vector<uint16_t> _port_numbers)
 	: port_map{},
-	default_local_ip{ _local_ip },
-	default_remove_ip{ _remote_ip }
+	default_local_ip{ _local_ip }
+	//default_remove_ip{ _remote_ip }
 {
 	for (auto n : _port_numbers)
 		port_map.emplace(n, 0);
@@ -96,7 +96,7 @@ void Udp_ports::send_packet(udp_packet & P)
 		static sockaddr_in addr;
 		addr.sin_family = AF_INET;
 		addr.sin_port = htons(P.dest_port);
-		addr.sin_addr.s_addr = inet_addr(localIP);
+		//addr.sin_addr.s_addr = inet_addr(localIP);
 		std::vector<uint8_t> bytes = P.to_bytes();
 		sendto(search->second, (const char*)bytes.data(), bytes.size(), 0, (const sockaddr *)&addr, sizeof(sockaddr_in));
 	}

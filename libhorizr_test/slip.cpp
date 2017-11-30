@@ -10,7 +10,7 @@ namespace libhorizr_test
 	TEST_CLASS(slip)
 	{
 	public:
-		
+#if 0		
 		TEST_METHOD(EmptyInput)
 		{
 			// TODO: Your test code here
@@ -50,5 +50,6 @@ namespace libhorizr_test
 			slip_encode(dest, source, true);
 			Assert::IsTrue(bytevector_compare(dest, expected) == 0);
 		}
+#endif
 	};
 }
