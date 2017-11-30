@@ -4,16 +4,18 @@
 #include <cstdint>
 #include <vector>
 
+#if 0
 // This byte indicates the end of a packet.
-const uint8_t SLIP_END = 192;
+extern const uint8_t SLIP_END = 192;
 // The byte used to indicate the beginning of a two-byte escape sequence.
-const uint8_t SLIP_ESC = 219;
+extern const uint8_t SLIP_ESC = 219;
 // The two-byte sequence 219 SLIP_ESC + 220 SLIP_ESC_END unpacks as 192 SLIP_END,
 // without indicating the end of a packet.
-const uint8_t SLIP_ESC_END = 220;
+extern const uint8_t SLIP_ESC_END = 220;
 // The two-byte sequence 219 SLIP_ESC + 221 SLIP_ESC_ESC unpacks as 219 SLIP_ESC,
 // without indicating a new escape sequence.
-const uint8_t SLIP_ESC_ESC = 221;
+extern const uint8_t SLIP_ESC_ESC = 221;
+#endif
 
 const size_t UDP_PACKET_HEADER_SIZE = 8;
 

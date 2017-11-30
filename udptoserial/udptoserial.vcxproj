@@ -30,24 +30,19 @@
     <ClInclude Include="input_queue.h" />
     <ClInclude Include="IPv4.h" />
     <ClInclude Include="Serial_port.h" />
+    <ClInclude Include="Server.h" />
     <ClInclude Include="Slip.h" />
     <ClInclude Include="udp_packet.h" />
     <ClInclude Include="Udp_ports.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\base64.c" />
-    <ClCompile Include="..\parser.c" />
-    <ClCompile Include="..\queue.c" />
-    <ClCompile Include="..\serial.c" />
-    <ClCompile Include="..\socket.c" />
-    <ClCompile Include="..\throttle.c" />
     <ClCompile Include="Configuration.cpp" />
     <ClCompile Include="ini.cpp" />
     <ClCompile Include="input_queue.cpp" />
     <ClCompile Include="IPv4.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Serial_port.cpp" />
-    <ClCompile Include="Slip.cpp" />
+    <ClCompile Include="Server.cpp" />
     <ClCompile Include="udp_packet.cpp" />
     <ClCompile Include="Udp_ports.cpp" />
   </ItemGroup>
@@ -130,10 +125,12 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
+      <AdditionalIncludeDirectories>"C:\Program Files\boost\boost_1_65_1\"</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files\boost\boost_1_65_1\stage\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -145,10 +142,12 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
+      <AdditionalIncludeDirectories>"C:\Program Files\boost\boost_1_65_1\"</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files\boost\boost_1_65_1\stage\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -162,12 +161,14 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
+      <AdditionalIncludeDirectories>"C:\Program Files\boost\boost_1_65_1\"</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files\boost\boost_1_65_1\stage\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -181,12 +182,14 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
+      <AdditionalIncludeDirectories>"C:\Program Files\boost\boost_1_65_1\"</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>C:\Program Files\boost\boost_1_65_1\stage\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

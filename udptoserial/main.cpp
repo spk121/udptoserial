@@ -23,6 +23,7 @@
 #include "Configuration.h"
 #include "Udp_ports.h"
 #include "IPv4.h"
+#include "Server.h"
 
 bool go = true;
 
@@ -46,6 +47,9 @@ int main()
 
 	Configuration config("udptoserial.ini");
 
+	asio_generic_server<chat_handler> server;
+	server.start_server(8888);
+#if 0
 	serial_port_init(config.serial_port_name, config.baud_rate, config.throttle_baud_rate);
 	Udp_ports udp_ports(config.local_ip, config.remote_ip, config.port_numbers);
 	input_queue inQueue;
@@ -90,7 +94,7 @@ int main()
 
 	//serial_port.close();
 	//udp_ports.close();
-
+#endif
 	return 0;
 }
 

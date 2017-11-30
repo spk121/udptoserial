@@ -2,6 +2,7 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include "Winsock2.h"
 
+#if 0
 struct ip4_hdr
 {
 	uint8_t ihl : 4;
@@ -148,6 +149,7 @@ static int udp_send()
 	uh->check = csum_tcpudp_magic(fl4->saddr, fl4->daddr, len,
 		sk->sk_protocol, csum);
 }
+#endif
 
 IPv4::IPv4()
 {

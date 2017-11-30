@@ -26,3 +26,5 @@ cl /EHsc /Zi /MD /I "c:\Program Files\boost\boost_1_65_1" logtest.cpp /link /LIB
 
 
 On windows, I had now luck with the automatic linking, so I didn't #define BOOST_LOG_DYN_LINK or BOOST_ALL_DYN_LINK
+
+Sometimes, it seems to complaing about defining _WIN32_WINDOWS and such.  You can fix that by addint <sdkddkver.h>

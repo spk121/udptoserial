@@ -57,26 +57,11 @@
     <ClInclude Include="IPv4.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Server.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\base64.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\parser.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\queue.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\serial.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\socket.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\throttle.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="udp_packet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -98,10 +83,10 @@
     <ClCompile Include="Configuration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Slip.cpp">
+    <ClCompile Include="IPv4.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="IPv4.cpp">
+    <ClCompile Include="Server.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

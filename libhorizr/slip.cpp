@@ -1,6 +1,19 @@
 #include "Slip.h"
 
-
+// This contains procedures that decode and encode bytevectors
+// using the RFC 1055 SLIP encoding rules
+#if 1
+// This byte indicates the end of a packet.
+const uint8_t SLIP_END = 192;
+// The byte used to indicate the beginning of a two-byte escape sequence.
+const uint8_t SLIP_ESC = 219;
+// The two-byte sequence 219 SLIP_ESC + 220 SLIP_ESC_END unpacks as 192 SLIP_END,
+// without indicating the end of a packet.
+const uint8_t SLIP_ESC_END = 220;
+// The two-byte sequence 219 SLIP_ESC + 221 SLIP_ESC_ESC unpacks as 219 SLIP_ESC,
+// without indicating a new escape sequence.
+const uint8_t SLIP_ESC_ESC = 221;
+#endif
 
 // Given SOURCE, a bytevector that may contain a SLIP-encoded message,
 // this function searches source for a complete SLIP-encoded message.

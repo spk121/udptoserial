@@ -1,5 +1,5 @@
 #include "udp_packet.h"
-#include "Slip.h"
+#include "../libhorizr/slip.h"
 #include "IPv4.h"
 
 udp_packet::udp_packet()
@@ -91,7 +91,7 @@ std::vector<uint8_t> udp_packet::to_bytes()
 	raw.insert(raw.end(), data.begin(), data.end());
 
 	std::vector<uint8_t> output;
-	slip_encode(raw, output);
+	//slip_encode(raw, output, true);
 	return output;
 }
 
@@ -105,14 +105,15 @@ size_t udp_packet::from_bytes(std::vector<uint8_t>& raw)
 	// One could do this with a single memory allocation.
 
 	std::vector<uint8_t> input;
-	size_t i = slip_decode(raw, input);
+	size_t i = 0;
+	// i = slip_decode(raw, input, true);
 
 	if (i == 0)
 		return 0;
-
+#if 0
 	// Skip over any length-1 messages
 	while (i == 1)
-		i = slip_decode(raw, input);
+		i = slip_decode(raw, input, true);
 
 	// Unpack the IPv4 header.
 	IPv4 ip_header;
@@ -162,4 +163,6 @@ size_t udp_packet::from_bytes(std::vector<uint8_t>& raw)
 		}
 	}
 	return i;
+#endif
+	return 0;
 }
