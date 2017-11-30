@@ -23,7 +23,6 @@ AC_CONFIG_AUX_DIR([build-aux])
 AC_SUBST([ACLOCAL_AMFLAGS], "-I m4")
 AC_CANONICAL_HOST
 
-
 dnl ***********************************************************************
 dnl Make version information available to autoconf files
 dnl ***********************************************************************
@@ -54,6 +53,7 @@ dnl ***********************************************************************
 dnl Check for required programs
 dnl ***********************************************************************
 AC_PROG_CC
+AC_PROG_CXX
 AC_PROG_INSTALL
 AC_PROG_SED
 
@@ -81,6 +81,7 @@ dnl ***********************************************************************
 AC_CONFIG_FILES([
 	Makefile
 	libhorizr/Makefile
+	udptoserial/Makefile
 ],[],
 [API_VERSION='$API_VERSION'])
 AC_OUTPUT

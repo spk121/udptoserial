@@ -19,10 +19,10 @@
 
 //#include "udp_packet.h"
 #include "input_queue.h"
-#include "Serial_port.h"
+// #include "Serial_port.h"
 #include "Configuration.h"
-#include "Udp_ports.h"
-#include "IPv4.h"
+// #include "Udp_ports.h"
+// #include "IPv4.h"
 #include "Server.h"
 
 bool go = true;
@@ -32,7 +32,7 @@ int main()
 	go = true;
 
 #if 1
-	ipv4_test();
+	// ipv4_test();
 #endif
 
 #ifdef WIN32
@@ -45,7 +45,7 @@ int main()
 	}
 #endif
 
-	Configuration config("udptoserial.ini");
+	// Configuration config("udptoserial.ini");
 
 	asio_generic_server<chat_handler> server;
 	server.start_server(8888);

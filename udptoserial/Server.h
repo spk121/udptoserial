@@ -1,6 +1,8 @@
 #pragma once
 
+#ifdef WIN32
 #include <sdkddkver.h>
+#endif
 #include <boost/asio.hpp>
 #include <boost/asio/error.hpp>
 #include <thread>
@@ -10,31 +12,6 @@
 
 using namespace boost;
 using namespace boost::asio::ip;
-
-static void throw_win32_sock_error(const char *func_name)
-{
-	// Retrieve the system error message for the last-error code
-	// and throw an exception.
-
-	const size_t message_len_max = 8 * 1024;
-	char system_message[message_len_max];
-	char output_message[message_len_max];
-	int dw = WSAGetLastError();
-
-	FormatMessageA(
-		FORMAT_MESSAGE_FROM_SYSTEM |
-		FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL,
-		dw,
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		system_message,
-		message_len_max, NULL);
-
-	// Display the error message and exit the process
-	snprintf(output_message, message_len_max, "%s failed with error %d: %s", func_name, dw, system_message);
-	throw std::exception(output_message);
-}
-
 template <typename ConnectionHandler>
 class asio_generic_server
 {
