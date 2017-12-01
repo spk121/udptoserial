@@ -13,34 +13,9 @@
 using namespace boost;
 using namespace boost::asio::ip;
 
-template <typename ConnectionHandler>
-class asio_generic_server
-{
-	using shared_handler_t = std::shared_ptr<ConnectionHandler>;
-public:
-	asio_generic_server(int thread_count = 1)
-		: thread_count_(thread_count)
-		, acceptor_(io_service_)
-	{}
 
-	// Given a local PORT on which to listen, this
-	// procedure binds that port to a TCP socket, then creates
-	// a HANDLER to stand by to receive the next connection.
-	void start_server(uint16_t port);
-
-private:
-
-	// Given a HANDLER which is standing by, this starts up HANDLER to
-	// deal with the new connection, then makes 
-	// another handler to stand by for the next connection.
-	void handle_new_connection(shared_handler_t handler, system::error_code const & error);
-
-	int thread_count_;
-	std::vector<std::thread> thread_pool_;
-	asio::io_service io_service_;
-	asio::ip::tcp::acceptor acceptor_;
-};
-
+// The async loop for chat handler ls
+// start-> read_packet (starts first async read) -> read_packet_done (finishes read, starts another)
 
 class chat_handler
 	: public std::enable_shared_from_this<chat_handler>
@@ -139,4 +114,37 @@ private:
 	asio::io_service::strand write_strand_;
 	asio::streambuf in_packet_;
 	std::deque<std::string> send_packet_queue;
+};
+
+
+class asio_generic_server
+{
+	using shared_handler_t = std::shared_ptr<chat_handler>;
+public:
+	asio_generic_server(int thread_count = 1)
+		: thread_count_(thread_count)
+		, tcp_server_acceptor_map_()
+	{}
+
+	// Given a local port on which to listen, this procedure
+	// binds that port to a TCP socket, then creates
+	// a HANDLER to stand by and receive the next connection.
+	void add_tcp_server_port(uint16_t);
+
+	// Given a local PORT on which to listen, this
+	// procedure binds that port to a TCP socket, then creates
+	// a HANDLER to stand by to receive the next connection.
+	void start_server(uint16_t port);
+
+private:
+
+	// Given a HANDLER which is standing by, this starts up HANDLER to
+	// deal with the new connection, then makes 
+	// another handler to stand by for the next connection.
+	void handle_new_connection(shared_handler_t handler, system::error_code const & error);
+
+	int thread_count_;
+	std::vector<std::thread> thread_pool_;
+	asio::io_service io_service_;
+	std::map<uint16_t, asio::ip::tcp::acceptor> tcp_server_acceptor_map_;
 };

@@ -14,8 +14,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libhorizr_test", "libhorizr
 		{F42D82D0-2C2C-4E6A-BF02-C9686366B470} = {F42D82D0-2C2C-4E6A-BF02-C9686366B470}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "asiotest", "asiotest\asiotest.vcxproj", "{C1CE38A0-0145-4D19-91F3-3A243352DA2E}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
