@@ -3,18 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27004.2009
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "udptoserial", "udptoserial.vcxproj", "{AB551E68-A862-477A-B14D-1964D5972B39}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "udptoserial", "udptoserial\udptoserial.vcxproj", "{AB551E68-A862-477A-B14D-1964D5972B39}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CameraOverUDP", "CameraOverUDP\CameraOverUDP.csproj", "{B2E18162-3DC9-4982-A69C-46B0901FFF61}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libhorizr", "..\libhorizr\libhorizr.vcxproj", "{F42D82D0-2C2C-4E6A-BF02-C9686366B470}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libhorizr", "libhorizr\libhorizr.vcxproj", "{F42D82D0-2C2C-4E6A-BF02-C9686366B470}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libhorizr_test", "..\libhorizr_test\libhorizr_test.vcxproj", "{677D081D-3225-43C5-AAB7-0FB08743EAF0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libhorizr_test", "libhorizr_test\libhorizr_test.vcxproj", "{677D081D-3225-43C5-AAB7-0FB08743EAF0}"
 	ProjectSection(ProjectDependencies) = postProject
 		{F42D82D0-2C2C-4E6A-BF02-C9686366B470} = {F42D82D0-2C2C-4E6A-BF02-C9686366B470}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "asiotest", "..\asiotest\asiotest.vcxproj", "{C1CE38A0-0145-4D19-91F3-3A243352DA2E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "asiotest", "asiotest\asiotest.vcxproj", "{C1CE38A0-0145-4D19-91F3-3A243352DA2E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

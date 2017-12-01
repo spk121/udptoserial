@@ -49,6 +49,8 @@ int main()
 
 	asio_generic_server<chat_handler> server;
 	server.start_server(8888);
+	server.start_server(8889);
+	server.run();
 #if 0
 	serial_port_init(config.serial_port_name, config.baud_rate, config.throttle_baud_rate);
 	Udp_ports udp_ports(config.local_ip, config.remote_ip, config.port_numbers);

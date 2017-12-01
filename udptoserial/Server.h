@@ -12,6 +12,7 @@
 
 using namespace boost;
 using namespace boost::asio::ip;
+
 template <typename ConnectionHandler>
 class asio_generic_server
 {
@@ -22,49 +23,17 @@ public:
 		, acceptor_(io_service_)
 	{}
 
-	void start_server(uint16_t port)
-	{
-		auto handler
-			= std::make_shared<ConnectionHandler>(io_service_);
-		// set up the acceptor to listen on the tcp port
-		asio::ip::tcp::endpoint endpoint(asio::ip::tcp::v4(), port);
-		acceptor_.open(endpoint.protocol());
-		acceptor_.set_option(tcp::acceptor::reuse_address(true));
-		acceptor_.bind(endpoint);
-		acceptor_.listen();
-		acceptor_.async_accept(handler->socket()
-			, [=](auto ec)
-		{
-			handle_new_connection(handler, ec);
-		}
-		);
-#if 0
-		// start pool of threads to process the asio events
-		for (int i = 0; i < thread_count_; ++i)
-		{
-			thread_pool_.emplace_back([=] {io_service_.run(); });
-		}
-#else
-		io_service_.run();
-#endif
-	}
+	// Given a local PORT on which to listen, this
+	// procedure binds that port to a TCP socket, then creates
+	// a HANDLER to stand by to receive the next connection.
+	void start_server(uint16_t port);
 
 private:
-	void handle_new_connection(shared_handler_t handler
-		, system::error_code const & error)
-	{
-		if (error) { std::cout << error.message(); return; }
-		handler->start();
-		auto new_handler
-			= std::make_shared<ConnectionHandler>(io_service_);
-		acceptor_.async_accept(new_handler->socket()
-			, [=](auto ec)
-		{
-			handle_new_connection(new_handler
-				, ec);
-		}
-		);
-	}
+
+	// Given a HANDLER which is standing by, this starts up HANDLER to
+	// deal with the new connection, then makes 
+	// another handler to stand by for the next connection.
+	void handle_new_connection(shared_handler_t handler, system::error_code const & error);
 
 	int thread_count_;
 	std::vector<std::thread> thread_pool_;
