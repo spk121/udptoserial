@@ -49,6 +49,8 @@ int main()
 
 	asio_generic_server server;
 	server.add_tcp_server_port(8888);
+	server.add_tcp_server_port(8889);
+	server.start_server();
 #if 0
 	serial_port_init(config.serial_port_name, config.baud_rate, config.throttle_baud_rate);
 	Udp_ports udp_ports(config.local_ip, config.remote_ip, config.port_numbers);

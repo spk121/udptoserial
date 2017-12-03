@@ -32,6 +32,7 @@
     <ClInclude Include="Serial_port.h" />
     <ClInclude Include="Server.h" />
     <ClInclude Include="Slip.h" />
+    <ClInclude Include="Tcp_server_handler.h" />
     <ClInclude Include="udp_packet.h" />
     <ClInclude Include="Udp_ports.h" />
   </ItemGroup>
@@ -43,6 +44,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Serial_port.cpp" />
     <ClCompile Include="Server.cpp" />
+    <ClCompile Include="Tcp_server_handler.cpp" />
     <ClCompile Include="udp_packet.cpp" />
     <ClCompile Include="Udp_ports.cpp" />
   </ItemGroup>
