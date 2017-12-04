@@ -73,8 +73,8 @@ void serial_read_handler(
   std::size_t bytes_transferred           // Number of bytes read.
 )
 {
-	BOOST_LOG_TRIVIAL(debug) << "serial port got " << bytes_transferred << " bytes";
-	serial_read_buffer_unprocessed_.insert(serial_read_buffer_unprocessed_.begin(), (unsigned char *)&serial_read_buffer_raw_[0], serial_read_buffer_raw_ + bytes_transferred);
+	serial_read_buffer_unprocessed_.insert(serial_read_buffer_unprocessed_.end(), (unsigned char *)&serial_read_buffer_raw_[0], serial_read_buffer_raw_ + bytes_transferred);
+	BOOST_LOG_TRIVIAL(debug) << "serial port has " << serial_read_buffer_unprocessed_.size() << " bytes";
 
 	// See if this is a complete SLIP message
 	std::vector<uint8_t> slip_msg;
@@ -82,7 +82,9 @@ void serial_read_handler(
 	bytes_decoded = slip_decode(slip_msg, serial_read_buffer_unprocessed_, false);
 	if (bytes_decoded > 0)
 	{
+		BOOST_LOG_TRIVIAL(debug) << "Slip decoded message of " << bytes_decoded << " bytes";
 		bool ret = ip_bytevector_validate(slip_msg);
+		BOOST_LOG_TRIVIAL(debug) << "Message is IPv4: " << ret;
 		#if 0
 		if (msg_type == MSG_TYPE_TCP)
 			// Check if that port is open and has a handler

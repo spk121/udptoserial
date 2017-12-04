@@ -1,5 +1,6 @@
 #include "Tcp_server_handler.h"
 #include "IPv4.h"
+#include "../libhorizr/slip.h"
 
 void serial_port_send(std::string binary_string);
 
@@ -84,7 +85,15 @@ void Tcp_server_handler::read_packet_done(system::error_code const & error, std:
 			printf("%c", c);
 	}
 	printf("\n");
-	send(binary_str);
+	std::vector<uint8_t> source;
+	for (auto x: binary_str)
+		source.push_back((uint8_t)x);
+	std::vector<uint8_t> dest;
+    slip_encode(dest, source, true);	
+	std::string dest_str;
+	for (auto x: dest)
+		dest_str.push_back(x);
+	send(dest_str);
 	read_packet();
 }
 

@@ -11,7 +11,7 @@
 // Return true if bv appears valid
 bool ip_bytevector_validate(std::vector<uint8_t>& bv)
 {
-	if (bv.size() < sizeof(ip_hdr))
+	if (bv.size() < sizeof(struct ip_hdr))
 		return false;
 	if (!ip_hdr_valid((ip_hdr*) bv.data()))
 		return false;
@@ -56,8 +56,6 @@ void ip_hdr_cksum_set(struct ip_hdr *ih)
 	ih->cksum = 0;
 	ip_cksum((uint8_t *)ih, ip_hdr_len(ih));
 }
-
-
 
 // Compute a IP-style checksum over a list of 16-bit integers
 uint16_t ip_cksum_multi(int n, uint8_t **parts, size_t *lengths)
