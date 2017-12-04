@@ -16,7 +16,7 @@ class Tcp_server_handler
 	: public std::enable_shared_from_this<Tcp_server_handler>
 {
 public:
-	Tcp_server_handler(asio::io_service& service);
+	Tcp_server_handler(asio::io_service& service, std::shared_ptr<asio::serial_port> sport) ;
 	~Tcp_server_handler();
 
 	boost::asio::ip::tcp::socket& socket()
@@ -43,5 +43,6 @@ private:
 	asio::streambuf in_packet_;
 	std::deque<std::string> send_packet_queue_;
 	uint32_t remote_addr_BE_;
+	std::shared_ptr<asio::serial_port> serial_port_;
 };
 

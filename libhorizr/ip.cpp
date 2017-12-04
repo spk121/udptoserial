@@ -1,6 +1,6 @@
 #include <stdexcept>
 #include <cstring>
-#include "IPv4.h"
+#include "ip.h"
 #ifdef WIN32
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include "Winsock2.h"
@@ -8,19 +8,29 @@
 #include <arpa/inet.h>
 #endif
 
+// Return true if bv appears valid
+bool ip_bytevector_validate(std::vector<uint8_t>& bv)
+{
+	if (bv.size() < sizeof(ip_hdr))
+		return false;
+	if (!ip_hdr_valid((ip_hdr*) bv.data()))
+		return false;
+	return true;
+}
+
 // Return true if IH appears to be a valid IPv4 header
-bool ip4_hdr_valid(struct ip4_hdr *ih)
+bool ip_hdr_valid(struct ip_hdr *ih)
 {
 	return true;
 }
 
 // Return the total length of the IPv4 header
-size_t ip4_hdr_len(struct ip4_hdr *ih)
+size_t ip_hdr_len(struct ip_hdr *ih)
 {
 	return (size_t)(ih->ihl) * 4U;
 }
 
-bool ip4_is_udp(struct ip4_hdr *ih)
+bool ip_is_udp(struct ip_hdr *ih)
 {
 	return ih->protocol == 0x11;
 }
@@ -41,16 +51,16 @@ static uint16_t ip_cksum(uint8_t *u8, size_t len)
 }
 
 // Update IPv4 checksum entry in the IPv4 header.
-void ip4_hdr_cksum_set(struct ip4_hdr *ih)
+void ip_hdr_cksum_set(struct ip_hdr *ih)
 {
 	ih->cksum = 0;
-	ip_cksum((uint8_t *)ih, ip4_hdr_len(ih));
+	ip_cksum((uint8_t *)ih, ip_hdr_len(ih));
 }
 
 
 
 // Compute a IP-style checksum over a list of 16-bit integers
-uint16_t ip4_cksum_multi(int n, uint8_t **parts, size_t *lengths)
+uint16_t ip_cksum_multi(int n, uint8_t **parts, size_t *lengths)
 {
 	uint32_t sum = 0;
 	uint8_t *u8;
@@ -72,7 +82,7 @@ uint16_t ip4_cksum_multi(int n, uint8_t **parts, size_t *lengths)
 }
 
 // Compute the checksum that goes in the UDP part of an IPv4 UDP packet
-uint16_t udp4_hdr_cksum_set(uint32BE_t saddr, uint32BE_t daddr, udp_hdr *hdr, uint8_t *data, size_t data_len)
+uint16_t udp_hdr_cksum_set(uint32BE_t saddr, uint32BE_t daddr, udp_hdr *hdr, uint8_t *data, size_t data_len)
 {
 	struct udp_cksum_pseudohdr phdr;
 	phdr.saddr = saddr;
@@ -86,14 +96,14 @@ uint16_t udp4_hdr_cksum_set(uint32BE_t saddr, uint32BE_t daddr, udp_hdr *hdr, ui
 	phdr.cksum = 0;
 	uint8_t *parts[2] = { (uint8_t *)&phdr, data };
 	size_t lengths[2] = { sizeof(phdr), data_len };
-	hdr->cksum = ip4_cksum_multi(2, parts, lengths);
+	hdr->cksum = ip_cksum_multi(2, parts, lengths);
 	if (hdr->cksum == 0x0)
 		hdr->cksum = 0xFFFF;
 	return hdr->cksum;
 }
 
 // Compute the checksum that goes in the TCP part of an IPv4 TCP packet
-uint16_t tcp4_hdr_cksum_set(uint32BE_t saddr, uint32BE_t daddr, tcp_hdr *hdr, uint8_t *data, size_t data_len)
+uint16_t tcp_hdr_cksum_set(uint32BE_t saddr, uint32BE_t daddr, tcp_hdr *hdr, uint8_t *data, size_t data_len)
 {
 	struct tcp_cksum_pseudohdr phdr;
 	phdr.saddr = saddr;
@@ -103,7 +113,7 @@ uint16_t tcp4_hdr_cksum_set(uint32BE_t saddr, uint32BE_t daddr, tcp_hdr *hdr, ui
 	phdr.tcp_segment_length = sizeof(struct tcp_hdr) + data_len;
 	uint8_t *parts[2] = { (uint8_t *)&phdr, data };
 	size_t lengths[2] = { sizeof(phdr), data_len };
-	hdr->checksum = ip4_cksum_multi(2, parts, lengths);
+	hdr->checksum = ip_cksum_multi(2, parts, lengths);
 	if (hdr->checksum == 0x0)
 		hdr->checksum = 0xFFFF;
 	return hdr->checksum;
@@ -111,7 +121,7 @@ uint16_t tcp4_hdr_cksum_set(uint32BE_t saddr, uint32BE_t daddr, tcp_hdr *hdr, ui
 
 
 // Fill in default values into an IPv4 packet header
-void ip4_headers_default_set(struct ip4_hdr *hdr, uint8_t protocol, uint32BE_t saddr, uint16BE_t sport, uint32BE_t daddr, uint16BE_t dport, uint8_t *data, size_t data_len)
+void ip_headers_default_set(struct ip_hdr *hdr, uint8_t protocol, uint32BE_t saddr, uint16BE_t sport, uint32BE_t daddr, uint16BE_t dport, uint8_t *data, size_t data_len)
 {
 	static uint16_t id = 0;
 
@@ -123,9 +133,9 @@ void ip4_headers_default_set(struct ip4_hdr *hdr, uint8_t protocol, uint32BE_t s
 	// zero means routine precedence, normal delay, normal throughput, normal reliability
 	hdr->type_of_service = 0x00;
 	// Length of the datagram: header + data, up to 64k bytes
-	if (data_len + sizeof(struct ip4_hdr) > UINT16_MAX)
+	if (data_len + sizeof(struct ip_hdr) > UINT16_MAX)
 		throw std::runtime_error("oversize payload for IPv4 packet");
-	hdr->total_length = sizeof(struct ip4_udp_hdr) + data_len;
+	hdr->total_length = sizeof(struct ip_udp_hdr) + data_len;
 	// Identifying value assigned by the sender to help reconstructing
 	// fragmented packets.
 	hdr->identification = htons(id++);
@@ -138,12 +148,12 @@ void ip4_headers_default_set(struct ip4_hdr *hdr, uint8_t protocol, uint32BE_t s
 	hdr->cksum = htons(0x0000);
 	hdr->saddr = saddr;
 	hdr->daddr = daddr;
-	ip4_hdr_cksum_set(hdr);
+	ip_hdr_cksum_set(hdr);
 }
 
 // Fill in default values into an IPv4 + UDP packet header.
 // We do the bare minimum to make it convincing.
-void ip4_udp_headers_default_set(struct ip4_hdr *ip4_hdr, struct udp_hdr *udp_hdr, uint32BE_t saddr, uint16BE_t sport, uint32BE_t daddr, uint16BE_t dport, uint8_t *data, size_t data_len)
+void ip_udp_headers_default_set(struct ip_hdr *ip_hdr, struct udp_hdr *udp_hdr, uint32BE_t saddr, uint16BE_t sport, uint32BE_t daddr, uint16BE_t dport, uint8_t *data, size_t data_len)
 {
 	static uint16_t id = 0;
 
@@ -153,18 +163,18 @@ void ip4_udp_headers_default_set(struct ip4_hdr *ip4_hdr, struct udp_hdr *udp_hd
 	udp_hdr->dest = dport;
 	udp_hdr->len = data_len + sizeof(udp_hdr);
 	udp_hdr->cksum = 0;
-	udp4_hdr_cksum_set(saddr, daddr, udp_hdr, data, data_len);
+	udp_hdr_cksum_set(saddr, daddr, udp_hdr, data, data_len);
 
 	uint8_t *data2 = (uint8_t*)malloc(data_len + sizeof(udp_hdr));
 	memcpy(data2, udp_hdr, sizeof(struct udp_hdr));
 	memcpy(data2 + sizeof(udp_hdr), data, data_len);
-	ip4_headers_default_set(ip4_hdr, IPV4_PROTOCOL_UDP, saddr, sport, daddr, dport, data2, data_len + sizeof(udp_hdr));
+	ip_headers_default_set(ip_hdr, IPV4_PROTOCOL_UDP, saddr, sport, daddr, dport, data2, data_len + sizeof(udp_hdr));
 	free(data2);
 }
 
 // Fill in default values into an IPv4 + TCP packet header.
 // We do the bare minimum to make it convincing.
-void ip4_tcp_headers_default_set(struct ip4_hdr *ip_hdr, struct tcp_hdr *tcp_hdr, uint32BE_t saddr, uint16BE_t sport, uint32BE_t daddr, uint16BE_t dport, uint8_t *data, size_t data_len)
+void ip_tcp_headers_default_set(struct ip_hdr *ip_hdr, struct tcp_hdr *tcp_hdr, uint32BE_t saddr, uint16BE_t sport, uint32BE_t daddr, uint16BE_t dport, uint8_t *data, size_t data_len)
 {
 	// Prepend the TCP packet header to DATA
 
@@ -178,12 +188,12 @@ void ip4_tcp_headers_default_set(struct ip4_hdr *ip_hdr, struct tcp_hdr *tcp_hdr
 	tcp_hdr->window = UINT16_MAX;
 	tcp_hdr->checksum = 0;
 	tcp_hdr->urgent_pointer = 0;
-	tcp4_hdr_cksum_set(saddr, daddr, tcp_hdr, data, data_len);
+	tcp_hdr_cksum_set(saddr, daddr, tcp_hdr, data, data_len);
 
 	uint8_t *data2 = (uint8_t*)malloc(data_len + sizeof(tcp_hdr));
 	memcpy(data2, tcp_hdr, sizeof(struct tcp_hdr));
 	memcpy(data2 + sizeof(tcp_hdr), data, data_len);
-	ip4_headers_default_set(ip_hdr, IPV4_PROTOCOL_TCP, saddr, sport, daddr, dport, data2, data_len + sizeof(udp_hdr));
+	ip_headers_default_set(ip_hdr, IPV4_PROTOCOL_TCP, saddr, sport, daddr, dport, data2, data_len + sizeof(udp_hdr));
 	free(data2);
 }
 

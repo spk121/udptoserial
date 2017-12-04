@@ -3,5 +3,6 @@
 
 #include "bytevector.h"
 #include "slip.h"
+#include "ip.h"
 
 #endif

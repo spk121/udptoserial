@@ -1,15 +1,20 @@
 #include "Tcp_server_handler.h"
 #include "IPv4.h"
 
-Tcp_server_handler::Tcp_server_handler(asio::io_service & service)
+void serial_port_send(std::string binary_string);
+
+Tcp_server_handler::Tcp_server_handler(asio::io_service & service, std::shared_ptr<asio::serial_port> sport)
 	: service_(service)
 	, socket_(service)
 	, write_strand_(service)
+	, serial_port_(sport)
 {
+	BOOST_LOG_TRIVIAL(debug) << "tcp server handler constructed";
 }
 
 Tcp_server_handler::~Tcp_server_handler()
 {
+	puts("tcp server handler destructed");
 }
 
 void Tcp_server_handler::read_packet()
@@ -65,13 +70,21 @@ void Tcp_server_handler::read_packet_done(system::error_code const & error, std:
 	memcpy(binary_msg + sizeof(iphdr) + sizeof(tcphdr), packet_string.c_str(), packet_string.size());
 	std::string binary_str((char *)binary_msg, sizeof(iphdr) + sizeof(tcphdr) + packet_string.size());
 	free(binary_msg);
+	printf("----\n");
 	for (auto c : binary_str)
 	{
-		if (isprint(c))
-			printf("%02x '%c'", c, c);
-		else
-			printf("%02x ", c);
+		printf("%02x ", (unsigned)c);
 	}
+	printf("\n");
+	for (auto c : binary_str)
+	{
+		if (c < 32)
+			printf("^%c",c+64);
+		else
+			printf("%c", c);
+	}
+	printf("\n");
+	send(binary_str);
 	read_packet();
 }
 
@@ -96,7 +109,7 @@ void Tcp_server_handler::packet_send_done(system::error_code const & error)
 void Tcp_server_handler::start_packet_send()
 {
 	send_packet_queue_.front() += "\0";
-	async_write(socket_
+	async_write(*serial_port_
 		, asio::buffer(send_packet_queue_.front())
 		, write_strand_.wrap([me = shared_from_this()]
 		(system::error_code const & ec
