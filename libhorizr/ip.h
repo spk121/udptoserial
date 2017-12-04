@@ -83,6 +83,7 @@ struct tcp_cksum_pseudohdr
 bool ip_bytevector_validate(std::vector<uint8_t>& bv);
 bool ip_bytevector_is_udp(std::vector<uint8_t>& bv);
 bool ip_bytevector_is_tcp(std::vector<uint8_t>& bv);
+size_t ip_bytevector_data_start(std::vector<uint8_t>& bv);
 
 bool ip_hdr_valid(struct ip_hdr *ih);
 size_t ip_hdr_len(struct ip_hdr *ih);

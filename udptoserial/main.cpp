@@ -33,8 +33,29 @@
 using namespace std::placeholders;
 
 bool go = true;
+struct ephemeral_connection
+{
+	uint32_t saddr;
+	uint32_t daddr;
+	uint16_t sport;
+	uint16_t dport;
+};
+
+struct ephemeral_compare
+{
+	constexpr bool operator()(const struct ephemeral_connection& lhs, const struct ephemeral_connection& rhs ) const
+	{
+		if (lhs.saddr < lhs.daddr)
+			return true;
+		else if (lhs.saddr == lhs.daddr && lhs.sport < lhs.dport)
+			return true;
+		return false;
+	}
+};
+
 asio::io_service io_service_;
 std::map<uint16_t, std::shared_ptr<asio::ip::tcp::acceptor>> tcp_server_acceptor_map_;
+std::map<struct ephemeral_connection, std::shared_ptr<asio::ip::tcp::socket>, ephemeral_compare> tcp_ephemeral_socket_map_;
 std::shared_ptr<asio::serial_port> serial_port_;
 std::list<std::shared_ptr<Tcp_server_handler>> tcp_server_handler_list_;
 
@@ -95,13 +116,55 @@ void serial_read_handler(
 
 				// Make sure that the data in the sin_port and sin_addr are
 				// in network byte order.
-				struct sockaddr_in addr;
-				addr.sin_family = AF_INET;
-				addr.sin_addr.s_addr = phdr->_ip_hdr.saddr;
-				addr.sin_port = phdr->_tcp_hdr.source_port;
+				struct sockaddr_in saddr, daddr;
+				saddr.sin_family = AF_INET;
+				saddr.sin_addr.s_addr = phdr->_ip_hdr.saddr;
+				saddr.sin_port = phdr->_tcp_hdr.source_port;
+				daddr.sin_family = AF_INET;
+				daddr.sin_addr.s_addr = phdr->_ip_hdr.daddr;
+				daddr.sin_port = phdr->_tcp_hdr.destination_port;
 				BOOST_LOG_TRIVIAL(debug) << "Valid slip-decoded TCP message of " << bytes_decoded << " bytes";
-				BOOST_LOG_TRIVIAL(debug) << inet_ntoa(addr.sin_addr) << ":"  << ntohs(addr.sin_port);
-				BOOST_LOG_TRIVIAL(debug) << phdr->_tcp_hdr.source_port << " -> " << phdr->_tcp_hdr.destination_port;
+				BOOST_LOG_TRIVIAL(debug) << inet_ntoa(saddr.sin_addr) << ":"  << ntohs(saddr.sin_port)
+					<< " -> " << inet_ntoa(daddr.sin_addr) << ":"  << ntohs(daddr.sin_port);
+
+				// Check to see if we have an ephemeral TCP client port that is handling this
+				// particular connection
+				struct ephemeral_connection key;
+				key.saddr = ntohl(saddr.sin_addr.s_addr);
+				key.daddr = ntohl(daddr.sin_addr.s_addr);
+				key.sport = ntohs(saddr.sin_port);
+				key.dport = ntohs(daddr.sin_port);
+				auto search = tcp_ephemeral_socket_map_.find(key);
+				if (search == tcp_ephemeral_socket_map_.end())
+				{
+					// Make a new ephemeral socket to handle this connection pair
+					asio::ip::address ADDR = asio::ip::address_v4(key.daddr); 
+					asio::ip::tcp::endpoint ENDPOINT(ADDR, key.dport);
+					auto p_socket = std::make_shared<asio::ip::tcp::socket>(io_service_);
+					boost::system::error_code ec;
+					p_socket->connect(ENDPOINT, ec);
+					if (ec)
+					{
+						// A connection error occurred
+						BOOST_LOG_TRIVIAL(debug) << "Connection failure " 
+							<< inet_ntoa(saddr.sin_addr) << ":"  << ntohs(saddr.sin_port)
+							<< " -> " << inet_ntoa(daddr.sin_addr) << ":"  << ntohs(daddr.sin_port);
+						return;
+					}
+					else
+					{
+						tcp_ephemeral_socket_map_.insert(std::make_pair(key, p_socket));
+						p_socket->send(boost::asio::buffer(slip_msg.data() + ip_bytevector_data_start(slip_msg),
+							slip_msg.size() - ip_bytevector_data_start(slip_msg)));
+					}
+				
+				}
+				else
+				{
+					// Forward this message using an existing socket
+					search->second->send(boost::asio::buffer(slip_msg.data() + ip_bytevector_data_start(slip_msg),
+						slip_msg.size() - ip_bytevector_data_start(slip_msg)));
+				}
 			}
 			else
 				BOOST_LOG_TRIVIAL(debug) << "Valid slip-decoded message of " << bytes_decoded << " bytes";

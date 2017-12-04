@@ -39,6 +39,31 @@ bool ip_bytevector_is_tcp(std::vector<uint8_t>& bv)
 {
 	return ((struct ip_hdr*) bv.data())->protocol == 0x6;
 }
+
+
+static size_t ip_bytevector_tcp_data_start(std::vector<uint8_t>& bv)
+{
+	//struct ip_tcp_hdr* ih = (struct ip_hdr*) bv.data();
+	return sizeof(ip_tcp_hdr);
+}
+
+static size_t ip_bytevector_udp_data_start(std::vector<uint8_t>& bv)
+{
+	return sizeof(ip_udp_hdr);
+}
+
+size_t ip_bytevector_data_start(std::vector<uint8_t>& bv)
+{
+	if (ip_bytevector_is_udp(bv))
+		return ip_bytevector_udp_data_start(bv);
+	else if (ip_bytevector_is_tcp(bv))
+		return ip_bytevector_tcp_data_start(bv);
+	else
+		throw std::runtime_error("Getting data on non TCP/UDP packet");
+}
+
+
+
 // Compute a IP-style checksum over a list of 16-bit integers
 static uint16_t ip_cksum(uint8_t *u8, size_t len)
 {
