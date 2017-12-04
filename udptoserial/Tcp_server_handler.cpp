@@ -62,8 +62,10 @@ void Tcp_server_handler::read_packet_done(system::error_code const & error, std:
 	struct ip4_hdr iphdr;
 	struct tcp_hdr tcphdr;
 	ip4_tcp_headers_default_set(&iphdr, &tcphdr,
-		socket_.remote_endpoint().address().to_v4().to_ulong(), socket_.remote_endpoint().port(),
-		remote_addr_BE_, socket_.local_endpoint().port(),
+		htonl(socket_.remote_endpoint().address().to_v4().to_ulong()),
+		htons(socket_.remote_endpoint().port()),
+		htonl(remote_addr_BE_),
+		htons(socket_.local_endpoint().port()),
 		(uint8_t *)packet_string.c_str(), packet_string.size());
 	uint8_t *binary_msg = (uint8_t *)malloc(sizeof (iphdr) + sizeof(tcphdr) + packet_string.size());
 	memcpy(binary_msg, &iphdr, sizeof(iphdr));

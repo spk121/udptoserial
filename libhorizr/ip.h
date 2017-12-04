@@ -49,6 +49,12 @@ struct ip_udp_hdr
 	struct udp_hdr _udp_hdr;
 };
 
+struct ip_tcp_hdr
+{
+	struct ip_hdr _ip_hdr;
+	struct tcp_hdr _tcp_hdr;
+};
+
 struct udp_cksum_pseudohdr
 {
 	uint32BE_t saddr;
@@ -75,6 +81,8 @@ struct tcp_cksum_pseudohdr
 #define IPV4_PROTOCOL_TCP 6
 
 bool ip_bytevector_validate(std::vector<uint8_t>& bv);
+bool ip_bytevector_is_udp(std::vector<uint8_t>& bv);
+bool ip_bytevector_is_tcp(std::vector<uint8_t>& bv);
 
 bool ip_hdr_valid(struct ip_hdr *ih);
 size_t ip_hdr_len(struct ip_hdr *ih);

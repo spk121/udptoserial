@@ -74,7 +74,7 @@ void serial_read_handler(
 )
 {
 	serial_read_buffer_unprocessed_.insert(serial_read_buffer_unprocessed_.end(), (unsigned char *)&serial_read_buffer_raw_[0], serial_read_buffer_raw_ + bytes_transferred);
-	BOOST_LOG_TRIVIAL(debug) << "serial port has " << serial_read_buffer_unprocessed_.size() << " bytes";
+	// BOOST_LOG_TRIVIAL(debug) << "serial port has " << serial_read_buffer_unprocessed_.size() << " bytes";
 
 	// See if this is a complete SLIP message
 	std::vector<uint8_t> slip_msg;
@@ -82,9 +82,33 @@ void serial_read_handler(
 	bytes_decoded = slip_decode(slip_msg, serial_read_buffer_unprocessed_, false);
 	if (bytes_decoded > 0)
 	{
-		BOOST_LOG_TRIVIAL(debug) << "Slip decoded message of " << bytes_decoded << " bytes";
+		serial_read_buffer_unprocessed_.erase(serial_read_buffer_unprocessed_.begin(), serial_read_buffer_unprocessed_.begin() + bytes_decoded);
+
 		bool ret = ip_bytevector_validate(slip_msg);
-		BOOST_LOG_TRIVIAL(debug) << "Message is IPv4: " << ret;
+		if (ret)
+		{
+			if (ip_bytevector_is_udp(slip_msg))
+				BOOST_LOG_TRIVIAL(debug) << "Valid slip-decoded UDP message of " << bytes_decoded << " bytes";
+			else if (ip_bytevector_is_tcp(slip_msg))
+			{
+				struct ip_tcp_hdr *phdr = (struct ip_tcp_hdr*)slip_msg.data();
+
+				// Make sure that the data in the sin_port and sin_addr are
+				// in network byte order.
+				struct sockaddr_in addr;
+				addr.sin_family = AF_INET;
+				addr.sin_addr.s_addr = phdr->_ip_hdr.saddr;
+				addr.sin_port = phdr->_tcp_hdr.source_port;
+				BOOST_LOG_TRIVIAL(debug) << "Valid slip-decoded TCP message of " << bytes_decoded << " bytes";
+				BOOST_LOG_TRIVIAL(debug) << inet_ntoa(addr.sin_addr) << ":"  << ntohs(addr.sin_port);
+				BOOST_LOG_TRIVIAL(debug) << phdr->_tcp_hdr.source_port << " -> " << phdr->_tcp_hdr.destination_port;
+			}
+			else
+				BOOST_LOG_TRIVIAL(debug) << "Valid slip-decoded message of " << bytes_decoded << " bytes";
+		}
+		else
+			BOOST_LOG_TRIVIAL(debug) << "Invalid slip decoded message of " << bytes_decoded << " bytes";
+		
 		#if 0
 		if (msg_type == MSG_TYPE_TCP)
 			// Check if that port is open and has a handler

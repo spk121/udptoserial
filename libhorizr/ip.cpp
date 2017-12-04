@@ -30,11 +30,15 @@ size_t ip_hdr_len(struct ip_hdr *ih)
 	return (size_t)(ih->ihl) * 4U;
 }
 
-bool ip_is_udp(struct ip_hdr *ih)
+bool ip_bytevector_is_udp(std::vector<uint8_t>& bv)
 {
-	return ih->protocol == 0x11;
+	return ((struct ip_hdr*) bv.data())->protocol == 0x11;
 }
 
+bool ip_bytevector_is_tcp(std::vector<uint8_t>& bv)
+{
+	return ((struct ip_hdr*) bv.data())->protocol == 0x6;
+}
 // Compute a IP-style checksum over a list of 16-bit integers
 static uint16_t ip_cksum(uint8_t *u8, size_t len)
 {

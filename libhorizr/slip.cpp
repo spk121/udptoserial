@@ -1,5 +1,6 @@
 #include "slip.h"
 #include <stdexcept>
+//#include <boost/log/trivial.hpp>
 
 // This contains procedures that decode and encode bytevectors
 // using the RFC 1055 SLIP encoding rules
@@ -27,7 +28,10 @@ size_t slip_decode(std::vector<uint8_t>& dest, const std::vector<uint8_t>& sourc
 	size_t size = source.size();
 	size_t i = 0;
 	uint8_t c, c2;
+	bool is_initiated = false;
 	bool is_terminated = false;
+
+	//printf("SLIP decode of vector length %d\n", source.size());
 
 	// Search for proper termination
 	while (i < size)
@@ -48,21 +52,36 @@ size_t slip_decode(std::vector<uint8_t>& dest, const std::vector<uint8_t>& sourc
 		else if (c == SLIP_END)
 		{
 			// If it is an END character, then we're done with the packet.
-			is_terminated = true;
-			break;
+			if (i == 0)
+			{
+				is_initiated = true;
+				//printf("SLIP_END initiator found\n");
+				i++;
+			}
+			else
+			{
+				is_terminated = true;
+				//printf("SLIP_END terminator found at %d\n", i); 
+			}
+			if (is_terminated)
+				break;
 		}
 	}
 
 	if (!is_terminated)
 		return 0;
-
+	
 	// Reset the position to the beginning.
 	i = 0;
 
 	while (i < size)
 	{
 		c = source[i];
-		if (c != SLIP_END && c != SLIP_ESC)
+		if ((i == 0) && is_initiated)
+		{
+			i++;
+		}
+		else if (c != SLIP_END && c != SLIP_ESC)
 		{
 			// Usually, the input byte passes through unchanged.
 			dest.push_back(c);
