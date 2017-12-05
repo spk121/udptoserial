@@ -156,8 +156,9 @@ void serial_read_handler(
 						tcp_ephemeral_socket_map_.insert(std::make_pair(key, p_socket));
 						p_socket->send(boost::asio::buffer(slip_msg.data() + ip_bytevector_data_start(slip_msg),
 							slip_msg.size() - ip_bytevector_data_start(slip_msg)));
+
+						// ADD read handler here.
 					}
-				
 				}
 				else
 				{
@@ -171,22 +172,6 @@ void serial_read_handler(
 		}
 		else
 			BOOST_LOG_TRIVIAL(debug) << "Invalid slip decoded message of " << bytes_decoded << " bytes";
-		
-		#if 0
-		if (msg_type == MSG_TYPE_TCP)
-			// Check if that port is open and has a handler
-			// If it is open, use the existing port to write.
-			// If it isn't open, open a new ephemeral port
-			;
-		else if (msg_type == MSG_TYPE_UDP)
-			// Check if that port is open and has a handler
-			// If it is open, use the existing port to write.
-			// If it isn't open, open a new ephemeral port
-			;
-		else
-			// unhandled message type, or junk
-			;
-			#endif
 	}
 	// And queue up the next async read
 
@@ -199,6 +184,7 @@ int main()
 {
 	go = true;
 
+	Configuration config("udptoserial.ini");
 #if 1
 	// ipv4_test();
 #endif
@@ -213,11 +199,10 @@ int main()
 	}
 #endif
 
-	std::string port = "/dev/ttyUSB0";
-	BOOST_LOG_TRIVIAL(debug) << "Adding new serial port port " << port;
+	BOOST_LOG_TRIVIAL(debug) << "Adding new serial port port " << config.serial_port_name;
 	serial_port_ = std::make_shared<asio::serial_port>(io_service_);
-	serial_port_->open(port);
-	serial_port_->set_option(asio::serial_port_base::baud_rate(115200));
+	serial_port_->open(config.serial_port_name);
+	serial_port_->set_option(asio::serial_port_base::baud_rate(config.baud_rate));
 
 	// Queue up an async read handler
 
@@ -225,9 +210,9 @@ int main()
 	(asio::mutable_buffers_1(serial_read_buffer_raw_, SERIAL_READ_BUFFER_SIZE),
 	serial_read_handler);
 
-	for (uint16_t port = 8888; port <= 8889; port ++)
+	for (uint16_t port : config.port_numbers)
 	{
-		// Configuration config("udptoserial.ini");
+
 		BOOST_LOG_TRIVIAL(debug) << "Adding new TCP server port " << port;
 
 		// We start off making an acceptor that we will later use to join a handler

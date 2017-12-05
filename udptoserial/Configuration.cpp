@@ -3,8 +3,9 @@
 
 #include "Configuration.h"
 #include "ini.h"
-
+#include <cstring>
 #include <exception>
+#include <stdexcept>
 
 #define CONFIG_UDP_PORT_COUNT_MAX (5)
 typedef struct
@@ -38,10 +39,10 @@ static int handler(void* user, const char* section, const char* name,
 #endif
 	}
 	else if (MATCH("network", "local_ip")) {
-		pconfig->localIP = _strdup(value);
+		pconfig->localIP = strdup(value);
 	}
 	else if (MATCH("network", "remote_ip")) {
-		pconfig->remoteIP = _strdup(value);
+		pconfig->remoteIP = strdup(value);
 	}
 	// This matches any line that begins with "port"
 	else if (strcmp(section, "udp ports") == 0 && strncmp(name, "port", 4) == 0) {
@@ -65,7 +66,7 @@ Configuration::Configuration(const char* filename)
 	memset(&config, 0, sizeof(config));
 	if (ini_parse(filename, handler, &config) < 0) {
 		std::string err = "Can't load or parse INI file '" + std::string(filename) + "':" + std::string(strerror(errno));
-		throw std::exception(err.c_str());
+		throw std::runtime_error(err.c_str());
 	}
 
 	if (config.serial_port_name != NULL)
