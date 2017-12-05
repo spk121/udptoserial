@@ -149,7 +149,7 @@ void serial_read_handler(
 						BOOST_LOG_TRIVIAL(debug) << "Connection failure " 
 							<< inet_ntoa(saddr.sin_addr) << ":"  << ntohs(saddr.sin_port)
 							<< " -> " << inet_ntoa(daddr.sin_addr) << ":"  << ntohs(daddr.sin_port);
-						return;
+						// return;
 					}
 					else
 					{
