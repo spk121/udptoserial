@@ -28,6 +28,7 @@
 #include "Configuration.h"
 // #include "Udp_ports.h"
 // #include "IPv4.h"
+#include "Ip_endpoint_join.h"
 #include "Tcp_server_handler.h"
 #include <functional>
 using namespace std::placeholders;
@@ -55,7 +56,7 @@ struct ephemeral_compare
 
 asio::io_service io_service_;
 std::map<uint16_t, std::shared_ptr<asio::ip::tcp::acceptor>> tcp_server_acceptor_map_;
-std::map<struct ephemeral_connection, std::shared_ptr<asio::ip::tcp::socket>, ephemeral_compare> tcp_ephemeral_socket_map_;
+std::map<Ip_endpoint_join<asio::ip::tcp::endpoint>, std::shared_ptr<asio::ip::tcp::socket>> tcp_ephemeral_socket_map_;
 std::shared_ptr<asio::serial_port> serial_port_;
 std::list<std::shared_ptr<Tcp_server_handler>> tcp_server_handler_list_;
 
@@ -149,7 +150,9 @@ void serial_read_handler(
 						BOOST_LOG_TRIVIAL(debug) << "Connection failure " 
 							<< inet_ntoa(saddr.sin_addr) << ":"  << ntohs(saddr.sin_port)
 							<< " -> " << inet_ntoa(daddr.sin_addr) << ":"  << ntohs(daddr.sin_port);
-						// return;
+						// FIXME: to avoid flooding connection attempts,
+						// there should be code here to avoid attempting a connection
+						// if such an attempt has occurred in the previous second or so.
 					}
 					else
 					{
@@ -158,6 +161,10 @@ void serial_read_handler(
 							slip_msg.size() - ip_bytevector_data_start(slip_msg)));
 
 						// ADD read handler here.
+						
+						p_socket->async_read_some(MutableBuffer, Read Handler);
+						(asio::mutable_buffers_1(serial_read_buffer_raw_, SERIAL_READ_BUFFER_SIZE),
+						serial_read_handler);						
 					}
 				}
 				else
