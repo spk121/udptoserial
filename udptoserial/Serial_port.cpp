@@ -11,6 +11,13 @@
 #include <unistd.h>		/* close */
 #endif
 
+#include <boost/asio.hpp>
+#include <boost/asio/error.hpp>
+#include <boost/asio/serial_port.hpp>
+#include "../libhorizr/ip.h"
+
+using namespace boost;
+
 // The filename of the serial port.  "COM3" for example.
 static std::string serial_port_name;
 
@@ -480,3 +487,244 @@ static void read_complete_callback(DWORD error_code, DWORD bytes_read, LPOVERLAP
 
 #endif 
 
+#include <deque>
+
+std::shared_ptr<asio::io_service> service_;
+std::shared_ptr<asio::io_service::strand> write_strand_;
+asio::streambuf in_packet_;
+std::deque<std::string> send_packet_queue_;
+std::shared_ptr<asio::serial_port> serial_port_;
+
+static void serial_port_init(std::shared_ptr<asio::io_service> io_service, std::string serial_port_name, int baud_rate)
+{
+	serial_port_ = std::make_shared<asio::serial_port>(io_service);
+	serial_port_->open(serial_port_name);
+	serial_port_->set_option(asio::serial_port_base::baud_rate(baud_rate));
+	service_ = io_service;
+	write_strand_ = std::make_shared<asio::io_service::strand>(io_service);
+
+
+	serial_port_->async_read_some
+	(asio::mutable_buffers_1(serial_read_buffer_raw_, SERIAL_READ_BUFFER_SIZE),
+		serial_read_handler);
+
+
+
+}
+
+////////////////////////////////////////////////
+// The following four serial_port_send functions
+// form an async queueing and sending chain.
+
+static void serial_port_send_tcp(asio::ip::tcp::endpoint& source,
+	asio::ip::tcp::endpoint& dest,
+	std::string payload)
+{
+	struct ip_hdr iphdr;
+	struct tcp_hdr tcphdr;
+	ip_tcp_headers_default_set(&iphdr, &tcphdr,
+		htonl(source.address().to_v4().to_ulong()),
+		htons(source.port()),
+		htonl(dest.address().to_v4().to_ulong()),
+		htons(source.port()),
+		(uint8_t *)payload.c_str(), payload.size());
+	uint8_t *binary_msg = (uint8_t *)malloc(sizeof(iphdr) + sizeof(tcphdr) + payload.size());
+	memcpy(binary_msg, &iphdr, sizeof(iphdr));
+	memcpy(binary_msg + sizeof(iphdr), &tcphdr, sizeof(tcphdr));
+	memcpy(binary_msg + sizeof(iphdr) + sizeof(tcphdr), payload.c_str(), payload.size());
+	std::string binary_str((char *)binary_msg, sizeof(iphdr) + sizeof(tcphdr) + payload.size());
+	free(binary_msg);
+	// slip
+	service_->post(write_strand_->wrap([binary_str]()
+	{
+		serial_port_queue_message(binary_str);
+	}));
+}
+
+void serial_port_queue_message(std::string message)
+{
+	bool write_in_progress = !send_packet_queue_.empty();
+	send_packet_queue_.push_back(std::move(message));
+	if (!write_in_progress)
+	{
+		serial_port_start_packet_send();
+	}
+}
+
+void serial_port_start_packet_send()
+{
+	send_packet_queue_.front() += "\0";
+	async_write(*serial_port_
+		, asio::buffer(send_packet_queue_.front())
+		, write_strand_->wrap([](system::error_code const & ec, std::size_t)
+		{
+			serial_port_packet_send_done(ec);
+		}
+	));
+}
+
+void serial_port_packet_send_done(system::error_code const & error)
+{
+	if (!error)
+	{
+		send_packet_queue_.pop_front();
+		if (!send_packet_queue_.empty())
+		{ 
+			serial_port_start_packet_send(); 
+		}
+	}
+}
+
+///////////////////////////
+// The following functions form the async serial port read handler
+
+
+
+void serial_read_handler(
+	const boost::system::error_code& error, // Result of operation.
+	std::size_t bytes_transferred           // Number of bytes read.
+)
+{
+	serial_read_buffer_unprocessed_.insert(serial_read_buffer_unprocessed_.end(), (unsigned char *)&serial_read_buffer_raw_[0], serial_read_buffer_raw_ + bytes_transferred);
+	// BOOST_LOG_TRIVIAL(debug) << "serial port has " << serial_read_buffer_unprocessed_.size() << " bytes";
+
+	// See if this is a complete SLIP message
+	std::vector<uint8_t> slip_msg;
+	size_t bytes_decoded;
+	bytes_decoded = slip_decode(slip_msg, serial_read_buffer_unprocessed_, false);
+	if (bytes_decoded > 0)
+	{
+		serial_read_buffer_unprocessed_.erase(serial_read_buffer_unprocessed_.begin(), serial_read_buffer_unprocessed_.begin() + bytes_decoded);
+
+		bool ret = ip_bytevector_validate(slip_msg);
+		if (ret)
+		{
+			if (ip_bytevector_is_udp(slip_msg))
+				BOOST_LOG_TRIVIAL(debug) << "Valid slip-decoded UDP message of " << bytes_decoded << " bytes";
+			else if (ip_bytevector_is_tcp(slip_msg))
+			{
+				struct ip_tcp_hdr *phdr = (struct ip_tcp_hdr*)slip_msg.data();
+
+				// Make sure that the data in the sin_port and sin_addr are
+				// in network byte order.
+				asio::ip::tcp::endpoint saddr(asio::ip::address_v4(phdr->_ip_hdr.saddr), phdr->_tcp_hdr.source_port);
+				asio::ip::tcp::endpoint daddr(asio::ip::address_v4(phdr->_ip_hdr.daddr), phdr->_tcp_hdr.destination_port);
+				slip_msg.erase(slip_msg.begin(), slip_msg.begin() + ip_bytevector_data_start(slip_msg));
+				tcp_send(saddr, daddr, slip_msg);
+
+				// ADD read handler here.
+
+				serial_port_->async_read_some(MutableBuffer, Read Handler);
+					(asio::mutable_buffers_1(serial_read_buffer_raw_, SERIAL_READ_BUFFER_SIZE),
+							serial_read_handler);
+			}
+			else
+				BOOST_LOG_TRIVIAL(debug) << "Valid slip-decoded message of " << bytes_decoded << " bytes";
+		}
+		else
+			BOOST_LOG_TRIVIAL(debug) << "Invalid slip decoded message of " << bytes_decoded << " bytes";
+	}
+	// And queue up the next async read
+
+	serial_port_->async_read_some
+	(asio::mutable_buffers_1(serial_read_buffer_raw_, SERIAL_READ_BUFFER_SIZE),
+		serial_read_handler);
+}
+
+#if 0
+
+// Now we prep this for transmission, using the following mapping.
+// From our point of view, this socket is local_address:server_port.
+// It is a forwarder for a server on destination_address:server_port.
+// It received a packet from remote_address:client_port.
+// The packet's SOURCE is remote_address:client_port.
+// The packet's DEST is local_address:server_port.
+
+// When we construct a forwarding packet
+// That packet's SOURCE is remote_address:client_port
+// That packet's DEST is destination_address:server_port
+
+// destination_address is from the .ini file 
+struct ip4_hdr iphdr;
+struct tcp_hdr tcphdr;
+ip4_tcp_headers_default_set(&iphdr, &tcphdr,
+	htonl(socket_.remote_endpoint().address().to_v4().to_ulong()),
+	htons(socket_.remote_endpoint().port()),
+	htonl(remote_addr_BE_),
+	htons(socket_.local_endpoint().port()),
+	(uint8_t *)packet_string.c_str(), packet_string.size());
+uint8_t *binary_msg = (uint8_t *)malloc(sizeof(iphdr) + sizeof(tcphdr) + packet_string.size());
+memcpy(binary_msg, &iphdr, sizeof(iphdr));
+memcpy(binary_msg + sizeof(iphdr), &tcphdr, sizeof(tcphdr));
+memcpy(binary_msg + sizeof(iphdr) + sizeof(tcphdr), packet_string.c_str(), packet_string.size());
+std::string binary_str((char *)binary_msg, sizeof(iphdr) + sizeof(tcphdr) + packet_string.size());
+free(binary_msg);
+printf("----\n");
+for (auto c : binary_str)
+{
+	printf("%02x ", (unsigned)c);
+}
+printf("\n");
+for (auto c : binary_str)
+{
+	if (c < 32)
+		printf("^%c", c + 64);
+	else
+		printf("%c", c);
+}
+printf("\n");
+std::vector<uint8_t> source;
+for (auto x : binary_str)
+source.push_back((uint8_t)x);
+std::vector<uint8_t> dest;
+slip_encode(dest, source, true);
+std::string dest_str;
+for (auto x : dest)
+dest_str.push_back(x);
+send(dest_str);
+read_packet();
+}
+
+void Tcp_client_handler::send(std::string msg)
+{
+	service_.post(write_strand_.wrap([me = shared_from_this(), msg]()
+	{
+		me->queue_message(msg);
+	}));
+}
+
+
+void Tcp_client_handler::packet_send_done(system::error_code const & error)
+{
+	if (!error)
+	{
+		send_packet_queue_.pop_front();
+		if (!send_packet_queue_.empty()) { start_packet_send(); }
+	}
+}
+
+void Tcp_client_handler::start_packet_send()
+{
+	send_packet_queue_.front() += "\0";
+	async_write(*serial_port_
+		, asio::buffer(send_packet_queue_.front())
+		, write_strand_.wrap([me = shared_from_this()]
+		(system::error_code const & ec
+			, std::size_t)
+	{
+		me->packet_send_done(ec);
+	}
+	));
+}
+
+void Tcp_client_handler::queue_message(std::string message)
+{
+	bool write_in_progress = !send_packet_queue_.empty();
+	send_packet_queue_.push_back(std::move(message));
+	if (!write_in_progress)
+	{
+		start_packet_send();
+	}
+}
+
+#endif

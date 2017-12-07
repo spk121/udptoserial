@@ -34,25 +34,6 @@
 using namespace std::placeholders;
 
 bool go = true;
-struct ephemeral_connection
-{
-	uint32_t saddr;
-	uint32_t daddr;
-	uint16_t sport;
-	uint16_t dport;
-};
-
-struct ephemeral_compare
-{
-	constexpr bool operator()(const struct ephemeral_connection& lhs, const struct ephemeral_connection& rhs ) const
-	{
-		if (lhs.saddr < lhs.daddr)
-			return true;
-		else if (lhs.saddr == lhs.daddr && lhs.sport < lhs.dport)
-			return true;
-		return false;
-	}
-};
 
 asio::io_service io_service_;
 std::map<uint16_t, std::shared_ptr<asio::ip::tcp::acceptor>> tcp_server_acceptor_map_;
