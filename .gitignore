@@ -12,6 +12,31 @@
 *.map
 *.exp
 
+# Visual Studio
+Thumbs.db
+*.user
+*.aps
+*.vspscc
+*_i.c
+*_p.c
+*.ncb
+*.suo
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.ilk
+*.log
+*.sbr
+*.vcxproj.filters
+.vs/
+[Oo]bj/
+[Bb]in
+[Dd]ebug*/
+[Rr]elease*/
+_ReSharper*/
+[Tt]est[Rr]esult*
+
 # Precompiled Headers
 *.gch
 *.pch
