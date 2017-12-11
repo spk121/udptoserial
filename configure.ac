@@ -80,8 +80,7 @@ dnl Process .in Files
 dnl ***********************************************************************
 AC_CONFIG_FILES([
 	Makefile
-	libhorizr/Makefile
-	udptoserial/Makefile
+	halfduplex/Makefile
 ],[],
 [API_VERSION='$API_VERSION'])
 AC_OUTPUT
