@@ -426,12 +426,14 @@ namespace Serial
     // I've sent an INFO message, and I'm expecting an ACK.
     if (m.type == Msg_type::ACK)
       {
+	no_response_timer_.cancel();
 	info_nak_count_ = 0;
 	state_ = State::MASTER_TRANSMIT;
       }
     else if (m.type == Msg_type::NAK)
       {
 	// Slave wants the previous message resent
+	no_response_timer_.cancel();
 	info_nak_count_++;
 	if (info_nak_count_ < MAX_INFO_TRIES)
 	  retransmit();
@@ -528,6 +530,9 @@ namespace Serial
 	state_ = State::MASTER_SELECT;
 	std::string reply_str = to_string(reply);
 	asio::write(port_, asio::buffer(reply_str));
+	no_response_timer_.expires_from_now(NO_RESPONSE_TIMEOUT);
+	auto func = std::bind(&Half_duplex::on_master_select_no_response_timeout, this, _1);
+	no_response_timer_.async_wait(func);
       }
   }
 
@@ -556,5 +561,19 @@ namespace Serial
   {
     std::string reply_str = to_string(last_message_);
     asio::write(port_, asio::buffer(reply_str));
+  }
+
+  void Half_duplex::on_master_select_no_response_timeout(const system::error_code& ec)
+  {
+    if (ec != asio::error::operation_aborted)
+      {
+	BOOST_LOG_TRIVIAL(debug) << "on_master_select_no_response_timeout";
+	Msg reply;
+	reply.type = Msg_type::EOT;
+	std::string reply_str = to_string(reply);
+	asio::write(port_, asio::buffer(reply_str));
+	state_ = State::NEUTRAL;
+	maybe_select();
+      }
   }
 }

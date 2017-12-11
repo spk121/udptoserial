@@ -73,6 +73,7 @@ namespace Serial {
     // We should be in MASTER_TRANSMIT, so let's send out a message.
     void transmit();
     void retransmit();
+    void on_master_select_no_response_timeout(const system::error_code& ec);
 
     asio::serial_port port_;
     State state_;
