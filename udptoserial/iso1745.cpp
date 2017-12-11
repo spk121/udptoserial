@@ -53,6 +53,7 @@ namespace Iso1745
 		{
 		case SOH:
 		case STX:
+			// Remember prefixes not allowed for these
 			parse_information_msg();
 			break;
 		case EOT:

@@ -27,7 +27,7 @@ Tcp_client_handler::~Tcp_client_handler()
 
 // When info comes from the slow serial port to the fast internal
 // networking, we ship it ASAP.  No async here.
-void Tcp_client_handler::send_to_server(const std::string& msg)
+void Tcp_client_handler::send_to_remote(const std::string& msg)
 {
 	BOOST_LOG_TRIVIAL(debug) << "Send to TCP server"
     << " orig " << endpoint_source_orig_.address().to_string() << ":" << endpoint_source_orig_.port()

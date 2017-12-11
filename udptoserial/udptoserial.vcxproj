@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -29,6 +29,7 @@
     <ClInclude Include="ini.h" />
     <ClInclude Include="input_queue.h" />
     <ClInclude Include="IPv4.h" />
+    <ClInclude Include="iso1745.h" />
     <ClInclude Include="Serial_port.h" />
     <ClInclude Include="Server.h" />
     <ClInclude Include="Slip.h" />
@@ -42,6 +43,7 @@
     <ClCompile Include="ini.cpp" />
     <ClCompile Include="input_queue.cpp" />
     <ClCompile Include="IPv4.cpp" />
+    <ClCompile Include="iso1745.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Serial_port.cpp" />
     <ClCompile Include="Server.cpp" />
