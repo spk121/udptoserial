@@ -54,6 +54,11 @@ namespace Serial
 	if (!m.body.empty())
 	  out.insert(out.cend(), m.body.begin(), m.body.end());
 	out.push_back(ETX);
+
+	uint32_t sum = 0;
+	for (auto x: out.substr(1))
+	  sum += x;
+	out.push_back((char)(uint8_t)(((sum & 0xFFu) + 1u) & 0xFFu));
       }
     else
       abort();
@@ -365,7 +370,6 @@ namespace Serial
     // Normally, I've sent out an ENQ to request to be the master
     // station, and I'm waiting for an ACK so I can start to send
     // data.
-    BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state()";
     if (m.type == Msg_type::ACK)
       {
 	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(ACK)";
@@ -396,9 +400,33 @@ namespace Serial
 	  }
       }
     else if (m.type == Msg_type::DLE_EOT)
-      handle_clear_request();
+      {
+	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(DLE_EOT)";
+	
+	handle_clear_request();
+      }
+    else if (m.type == Msg_type::EOT)
+      {
+	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(EOT)";
+	state_ = State::NEUTRAL;
+	maybe_select();
+      }
+    else if (m.type == Msg_type::ENQ)
+      {
+	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(ACK)";
+	// This is a race: both sides want to be master.  We concede.
+	  {
+	    Msg reply;
+	    reply.type = Msg_type::ACK;
+	    std::string m_str = to_string(m);
+	    asio::write(port_, asio::buffer(m_str));
+	    state_ = State::SLAVE_RECEIVE;
+	  }
+      }
     else
       {
+	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(" << (int)m.type << ")";
+	
 	// Invalid.  Try to recover.
 	Msg reply;
 	reply.type = Msg_type::EOT;
