@@ -1,11 +1,18 @@
 #include "Half_duplex.h"
 #include <string>
 
+#define LONG_TIMEOUTS
 namespace Serial
 {
+  #ifdef LONG_TIMEOUTS
+  const static auto NO_RESPONSE_TIMEOUT = posix_time::seconds(30);
+  const static auto NO_RECEIVE_TIMEOUT = posix_time::seconds(20);
+  const static auto NO_ACTIVITY_TIMEOUT = posix_time::seconds(200);
+  #else
   const static auto NO_RESPONSE_TIMEOUT = posix_time::seconds(3);
   const static auto NO_RECEIVE_TIMEOUT = posix_time::seconds(2);
   const static auto NO_ACTIVITY_TIMEOUT = posix_time::seconds(20);
+  #endif
   const static size_t MAX_PREFIX_LEN = 15;
   const static size_t MAX_MESSAGE_LEN = 1550;
   const static size_t MAX_ENQ_TRIES = 20;
@@ -24,7 +31,46 @@ namespace Serial
   const std::string CONTROL_CHARACTERS =   "\x01\x02\x03\x04\x05\x06\x10\x15\x16\x17";
   const std::string MSG_START_CHARACTERS = "\x01\x02\x04\x05\x06\x10\x15";
   
+  std::string to_string(State s)
+  {
+    if (s == State::NEUTRAL)
+      return "NEUTRAL";
+    else if (s == State::MASTER_SELECT)
+      return "MASTER_SELECT";
+    else if (s == State::MASTER_RECEIVE)
+      return "MASTER_RECEIVE";
+    else if (s == State::MASTER_TRANSMIT)
+      return "MASTER_TRANSMIT";
+    else if (s == State::SLAVE_RECEIVE)
+      return "SLAVE_RECEIVE";
+    else if (s == State::SLAVE_TRANSMIT)
+      return "SLAVE_TRANSMIT";
+    else
+      return "UNKNOWN_STATE";
+  }
 
+  std::string to_string(Msg_type s)
+  {
+    if (s == Msg_type::NONE)
+      return "NONE";
+    else if (s == Msg_type::ACK)
+      return "ACK";
+    else if (s == Msg_type::NAK)
+      return "NAK";
+    else if (s == Msg_type::EOT)
+      return "EOT";
+    else if (s == Msg_type::DLE_EOT)
+      return "DLE_EOT";
+    else if (s == Msg_type::ENQ)
+      return "ENQ";
+    else if (s == Msg_type::INFO)
+      return "INFO";
+    else if (s == Msg_type::ERROR)
+      return "ERROR";
+    else
+      return "UNKNOWN_TYPE";
+  }
+    
   static std::string to_string(Msg& m)
   {
     std::string out;
@@ -326,6 +372,7 @@ namespace Serial
   void Half_duplex::handle_message_neutral_state(Msg& m)
     {
       // Normally, I expect to receive an ENQ.
+      BOOST_LOG_TRIVIAL(debug) << "handle_message_neutral_state(" << (int)m.type << ")";
       if (m.type == Msg_type::ENQ)
 	{
 	  if (accepting_input_)
@@ -334,7 +381,7 @@ namespace Serial
 	      m.type = Msg_type::ACK;
 	      std::string m_str = to_string(m);
 	      asio::write(port_, asio::buffer(m_str));
-	      state_ = State::SLAVE_RECEIVE;
+	      change_state(State::SLAVE_RECEIVE);
 	    }
 	  else
 	    {
@@ -342,13 +389,13 @@ namespace Serial
 	      m.type = Msg_type::NAK;
 	      std::string m_str = to_string(m);
 	      asio::write(port_, asio::buffer(m_str));
-	      state_ = State::NEUTRAL;
+	      change_state(State::NEUTRAL);
 	      maybe_select();
 	    }
 	}
       else if (m.type == Msg_type::EOT)
 	{
-	  state_ = State::NEUTRAL;
+	  change_state(State::NEUTRAL);
 	  maybe_select();
 	}
       else if (m.type == Msg_type::DLE_EOT)
@@ -360,7 +407,7 @@ namespace Serial
 	  m.type = Msg_type::EOT;
 	  std::string m_str = to_string(m);
 	  asio::write(port_, asio::buffer(m_str));
-	  state_ = State::NEUTRAL;
+	  change_state(State::NEUTRAL);
 	  maybe_select();
 	}
     }
@@ -370,22 +417,23 @@ namespace Serial
     // Normally, I've sent out an ENQ to request to be the master
     // station, and I'm waiting for an ACK so I can start to send
     // data.
+    usleep(400000);
+    BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(" << to_string(m.type) << ")";
     if (m.type == Msg_type::ACK)
       {
-	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(ACK)";
 	enq_nak_count_ = 0;
-	state_ = State::MASTER_TRANSMIT;
+	change_state(State::MASTER_TRANSMIT);
 	transmit();
+	return;
       }
     else if (m.type == Msg_type::NAK)
       {
-	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(NAK)";
 	// If the other end rejects me, normally jump back to
 	// neutral, unless this has happened too many times.
 	enq_nak_count_++;
 	if (enq_nak_count_ < MAX_ENQ_TRIES)
 	  {
-	    state_ = State::NEUTRAL;
+	    change_state(State::NEUTRAL);
 	    retransmit();
 	  }
 	else
@@ -395,44 +443,44 @@ namespace Serial
 	    reply.type = Msg_type::EOT;
 	    std::string m_str = to_string(m);
 	    asio::write(port_, asio::buffer(m_str));
-	    state_ = State::NEUTRAL;
+	    change_state(State::NEUTRAL);
 	    maybe_select();
 	  }
+	return;
       }
     else if (m.type == Msg_type::DLE_EOT)
       {
-	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(DLE_EOT)";
 	
 	handle_clear_request();
+	return;
+	
       }
     else if (m.type == Msg_type::EOT)
       {
-	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(EOT)";
-	state_ = State::NEUTRAL;
+	change_state(State::NEUTRAL);
 	maybe_select();
+	return;
       }
     else if (m.type == Msg_type::ENQ)
       {
-	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(ACK)";
 	// This is a race: both sides want to be master.  We concede.
 	  {
 	    Msg reply;
 	    reply.type = Msg_type::ACK;
 	    std::string m_str = to_string(m);
 	    asio::write(port_, asio::buffer(m_str));
-	    state_ = State::SLAVE_RECEIVE;
+	    change_state(State::SLAVE_RECEIVE);
 	  }
+	return;
       }
     else
       {
-	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(" << (int)m.type << ")";
-	
 	// Invalid.  Try to recover.
 	Msg reply;
 	reply.type = Msg_type::EOT;
 	std::string m_str = to_string(m);
 	asio::write(port_, asio::buffer(m_str));
-	state_ = State::NEUTRAL;
+	change_state(State::NEUTRAL);
 	maybe_select();
       }
   }
@@ -441,6 +489,7 @@ namespace Serial
   {
     // I'm not expecting any messages right now.  It is supposed to
     // be my turn to send INFO messages.
+      BOOST_LOG_TRIVIAL(debug) << "handle_message_master_transmit_state(" << (int)m.type << ")";
     if (m.type == Msg_type::DLE_EOT)
       handle_clear_request();
     else
@@ -450,7 +499,7 @@ namespace Serial
 	reply.type = Msg_type::EOT;
 	std::string m_str = to_string(m);
 	asio::write(port_, asio::buffer(m_str));
-	state_ = State::NEUTRAL;
+	change_state(State::NEUTRAL);
 	maybe_select();
       }
   }
@@ -458,11 +507,12 @@ namespace Serial
   void Half_duplex::handle_message_master_receive_state(Msg& m)
   {
     // I've sent an INFO message, and I'm expecting an ACK.
+      BOOST_LOG_TRIVIAL(debug) << "handle_message_master_receive_state(" << (int)m.type << ")";
     if (m.type == Msg_type::ACK)
       {
 	no_response_timer_.cancel();
 	info_nak_count_ = 0;
-	state_ = State::MASTER_TRANSMIT;
+	change_state(State::MASTER_TRANSMIT);
       }
     else if (m.type == Msg_type::NAK)
       {
@@ -478,7 +528,7 @@ namespace Serial
 	    reply.type = Msg_type::EOT;
 	    std::string m_str = to_string(m);
 	    asio::write(port_, asio::buffer(m_str));
-	    state_ = State::NEUTRAL;
+	    change_state(State::NEUTRAL);
 	    maybe_select();
 	  }
       }
@@ -491,7 +541,7 @@ namespace Serial
 	reply.type = Msg_type::EOT;
 	std::string m_str = to_string(m);
 	asio::write(port_, asio::buffer(m_str));
-	state_ = State::NEUTRAL;
+	change_state(State::NEUTRAL);
 	maybe_select();
 	  
       }
@@ -500,6 +550,7 @@ namespace Serial
   void Half_duplex::handle_message_slave_receive_state(Msg& m)
   {
     // I'm expecting for an INFO message from master.
+      BOOST_LOG_TRIVIAL(debug) << "handle_message_slave_receive_state(" << (int)m.type << ")";
     if (m.type == Msg_type::INFO)
       {
 	if (accepting_input_)
@@ -525,7 +576,7 @@ namespace Serial
     else if (m.type == Msg_type::EOT)
       {
 	// A graceful request to return to neutral
-	state_ = State::NEUTRAL;
+	change_state(State::NEUTRAL);
 	maybe_select();
       }
     else if (m.type == Msg_type::DLE_EOT)
@@ -537,7 +588,7 @@ namespace Serial
 	reply.type = Msg_type::EOT;
 	std::string reply_str = to_string(reply);
 	asio::write(port_, asio::buffer(reply_str));
-	state_ = State::NEUTRAL;
+	change_state(State::NEUTRAL);
 	maybe_select();
       }
   }
@@ -550,7 +601,7 @@ namespace Serial
     input_queue_.clear();
     output_queue_.clear();
     io_mutex_.unlock();
-    state_ = State::NEUTRAL;
+    change_state(State::NEUTRAL);
   }
 
   // We should be in NEUTRAL, so let's try to become the master station.
@@ -561,7 +612,7 @@ namespace Serial
 	BOOST_LOG_TRIVIAL(debug) << "maybe_select(): send ENQ";
 	Msg reply;
 	reply.type = Msg_type::ENQ;
-	state_ = State::MASTER_SELECT;
+	change_state(State::MASTER_SELECT);
 	std::string reply_str = to_string(reply);
 	asio::write(port_, asio::buffer(reply_str));
 	no_response_timer_.expires_from_now(NO_RESPONSE_TIMEOUT);
@@ -575,15 +626,17 @@ namespace Serial
   {
     if (output_queue_.empty())
       {
+	BOOST_LOG_TRIVIAL(debug) << "transmit() empty queue";
 	Msg reply;
 	reply.type = Msg_type::EOT;
 	std::string reply_str = to_string(reply);
 	asio::write(port_, asio::buffer(reply_str));
-	state_ = State::NEUTRAL;
+	change_state(State::NEUTRAL);
 	maybe_select();
       }
     else
       {
+	BOOST_LOG_TRIVIAL(debug) << "transmit(), " << output_queue_.size() << " messages in queue";
 	last_message_ = output_queue_.front();
 	output_queue_.pop_front();
 	std::string reply_str = to_string(last_message_);
@@ -606,8 +659,16 @@ namespace Serial
 	reply.type = Msg_type::EOT;
 	std::string reply_str = to_string(reply);
 	asio::write(port_, asio::buffer(reply_str));
-	state_ = State::NEUTRAL;
+	change_state(State::NEUTRAL);
 	maybe_select();
       }
+  }
+
+  
+  void Half_duplex::change_state(State _new)
+  {
+    State old_state = state_;
+    state_ = _new;
+    BOOST_LOG_TRIVIAL(debug) << "state transition from " << to_string(old_state) << " to " << to_string(_new);
   }
 }

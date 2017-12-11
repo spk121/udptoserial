@@ -22,7 +22,8 @@ namespace Serial {
     SLAVE_RECEIVE,
     SLAVE_TRANSMIT,
   };
-  
+
+  std::string to_string(State s);
     enum class Msg_type {
     NONE,
     ACK,
@@ -74,6 +75,7 @@ namespace Serial {
     void transmit();
     void retransmit();
     void on_master_select_no_response_timeout(const system::error_code& ec);
+    void change_state(State s);
 
     asio::serial_port port_;
     State state_;
