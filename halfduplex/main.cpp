@@ -23,7 +23,7 @@ int main()
   asio::io_service service;
   try
     {
-      com = std::make_shared<Serial::Half_duplex>(service, "/dev/ttyUSB0", 115200);
+      com = std::make_shared<Serial::Half_duplex>(service, "/dev/ttyUSB0", 115200, true);
       asio::deadline_timer timer(service);
       timer.expires_from_now(boost::posix_time::seconds(1));
       timer.async_wait(timer_handler);

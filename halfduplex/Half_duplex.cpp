@@ -33,7 +33,9 @@ namespace Serial
   
   std::string to_string(State s)
   {
-    if (s == State::NEUTRAL)
+    if (s == State::POLLING)
+      return "POLLING";
+    else if (s == State::NEUTRAL)
       return "NEUTRAL";
     else if (s == State::MASTER_SELECT)
       return "MASTER_SELECT";
@@ -112,7 +114,7 @@ namespace Serial
   }
 
 
-  Half_duplex::Half_duplex(asio::io_service& ios, const std::string & device, unsigned int _baud_rate)
+  Half_duplex::Half_duplex(asio::io_service& ios, const std::string & device, unsigned int _baud_rate, bool ctrl)
     : port_(ios, device)
     , accepting_input_(true)
       , no_response_timer_(ios)
@@ -120,6 +122,7 @@ namespace Serial
       , no_activity_timer_(ios)
     , enq_nak_count_(0)
     , info_nak_count_(0)
+    , controller_(ctrl)
     {
       port_.set_option(asio::serial_port_base::baud_rate(_baud_rate));
 
@@ -463,13 +466,24 @@ namespace Serial
       }
     else if (m.type == Msg_type::ENQ)
       {
-	// This is a race: both sides want to be master.  We concede.
+	// This is a race: both sides want to be master.  Maybe concede.
+	if (!controller_)
 	  {
 	    Msg reply;
 	    reply.type = Msg_type::ACK;
 	    std::string m_str = to_string(m);
 	    asio::write(port_, asio::buffer(m_str));
 	    change_state(State::SLAVE_RECEIVE);
+	  }
+	else
+	  {
+	    // Invalid.  Try to recover.
+	    Msg reply;
+	    reply.type = Msg_type::EOT;
+	    std::string m_str = to_string(m);
+	    asio::write(port_, asio::buffer(m_str));
+	    change_state(State::NEUTRAL);
+	    maybe_select();
 	  }
 	return;
       }

@@ -16,6 +16,7 @@ namespace Serial {
 
   enum class State {
     NEUTRAL,
+    POLLING,
     MASTER_SELECT,
     MASTER_RECEIVE,
     MASTER_TRANSMIT,
@@ -24,7 +25,7 @@ namespace Serial {
   };
 
   std::string to_string(State s);
-    enum class Msg_type {
+  enum class Msg_type {
     NONE,
     ACK,
     NAK,
@@ -35,6 +36,8 @@ namespace Serial {
     ERROR
   };
 
+  std::string to_string(Msg_type m);
+  
   struct Msg {
     Msg_type type;
     std::string prefix;
@@ -46,7 +49,7 @@ namespace Serial {
   class Half_duplex {
 
   public:
-    Half_duplex(asio::io_service& ios, const std::string & device, unsigned int _baud_rate);
+    Half_duplex(asio::io_service& ios, const std::string & device, unsigned int _baud_rate, bool controller);
 
     void enqueue_message(std::string header, std::string body);
     bool get_next_message(std::string& header, std::string& body);
@@ -78,6 +81,7 @@ namespace Serial {
     void change_state(State s);
 
     asio::serial_port port_;
+    bool controller_;
     State state_;
     bool accepting_input_;
     size_t enq_nak_count_;
