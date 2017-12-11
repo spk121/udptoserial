@@ -550,7 +550,7 @@ namespace Serial
   void Half_duplex::handle_message_slave_receive_state(Msg& m)
   {
     // I'm expecting for an INFO message from master.
-      BOOST_LOG_TRIVIAL(debug) << "handle_message_slave_receive_state(" << (int)m.type << ")";
+    BOOST_LOG_TRIVIAL(debug) << "handle_message_slave_receive_state(" << to_string(m.type) << ")";
     if (m.type == Msg_type::INFO)
       {
 	if (accepting_input_)
@@ -581,7 +581,7 @@ namespace Serial
       }
     else if (m.type == Msg_type::DLE_EOT)
       handle_clear_request();
-    else
+    else if (m.type != Msg_type::ENQ)
       {
 	// Invalid.  Try to recover.
 	Msg reply;
