@@ -140,6 +140,9 @@ namespace Serial
 	    case State::NEUTRAL:
 	      handle_message_neutral_state(m);
 	      break;
+	    case State::MASTER_SELECT:
+	      handle_message_master_select_state(m);
+	      break;
 	    case State::MASTER_TRANSMIT:
 	      handle_message_master_transmit_state(m);
 	      break;
@@ -362,14 +365,17 @@ namespace Serial
     // Normally, I've sent out an ENQ to request to be the master
     // station, and I'm waiting for an ACK so I can start to send
     // data.
+    BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state()";
     if (m.type == Msg_type::ACK)
       {
+	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(ACK)";
 	enq_nak_count_ = 0;
 	state_ = State::MASTER_TRANSMIT;
 	transmit();
       }
     else if (m.type == Msg_type::NAK)
       {
+	BOOST_LOG_TRIVIAL(debug) << "handle_message_master_select_state(NAK)";
 	// If the other end rejects me, normally jump back to
 	// neutral, unless this has happened too many times.
 	enq_nak_count_++;
