@@ -157,9 +157,12 @@ namespace Serial
 		port_.async_read_some
 		(asio::mutable_buffers_1(input_raw_, RAW_READ_BUFFER_SIZE),
 			callback);
-		poll_timer_.expires_from_now(POLL_TIMEOUT);
-		auto func = std::bind(&Half_duplex::poll, this, _1);
-		poll_timer_.async_wait(func);
+		if (controller_)
+		{
+			poll_timer_.expires_from_now(POLL_TIMEOUT);
+			auto func = std::bind(&Half_duplex::poll, this, _1);
+			poll_timer_.async_wait(func);
+		}
 	}
 
 	// This is the public API that adds a message to the output queue.
@@ -297,20 +300,31 @@ namespace Serial
 		// to let me know that I can become the Master station.
 		// (The functionality where the supervisor peer becomes the master station
 		// is elsewhere in poll().)
-		if (m.type == Msg_type::ENQ && m.prefix == "bravo")
+		if (m.type == Msg_type::ENQ)
 		{
-			if (accepting_input_)
+			if (m.prefix == "bravo")
 			{
-				change_state(State::MASTER_SELECT_TRANSMIT);
-				write_simple_msg(Msg_type::ACK);
-				change_state(State::MASTER_SELECT_ACK_RECEIVE);
+				if (accepting_input_)
+				{
+					change_state(State::MASTER_SELECT_TRANSMIT);
+					write_simple_msg(Msg_type::ACK);
+					change_state(State::MASTER_SELECT_ACK_RECEIVE);
+				}
+				else
+				{
+					change_state(State::MASTER_SELECT_TRANSMIT);
+					write_simple_msg(Msg_type::EOT);
+					change_state(State::NEUTRAL);
+				}
 			}
-			else
+			else if (m.prefix == "alpha")
 			{
-				change_state(State::MASTER_SELECT_TRANSMIT);
-				write_simple_msg(Msg_type::EOT);
-				change_state(State::NEUTRAL);
+				change_state(State::SLAVE_SELECT_RECEIVE);
 			}
+		}
+		else if (m.type == Msg_type::EOT)
+		{
+			// Nothing to do.
 		}
 		else
 			throw std::runtime_error("invalid message in NEUTRAL");
@@ -318,23 +332,42 @@ namespace Serial
 
 	void Half_duplex::handle_message_slave_select_receive_state(Msg& m)
 	{
-		// Normally, I am the supervisor and I've sent out a poll ENQ.
-		// I'm expecting to receive a select ENQ directed at alpha (aka me) to which I'll respond with
-		// an ACK.
-		if (m.type == Msg_type::ENQ && m.prefix == "alpha")
+		// I'm expecting to receive a select ENQ directed at
+		// me to which I will respond with an ack.
+		if (m.type == Msg_type::ENQ)
 		{
-			if (accepting_input_)
+			if (controller_ && (m.prefix == "alpha"))
 			{
-				BOOST_LOG_TRIVIAL(debug) << "accepting selection by bravo";
-				change_state(State::SLAVE_SELECT_ACK_TRANSMIT);
-				write_simple_msg(Msg_type::ACK);
-				change_state(State::SLAVE_INFO_RECEIVE);
+				if (accepting_input_)
+				{
+					BOOST_LOG_TRIVIAL(debug) << "accepting selection by bravo";
+					change_state(State::SLAVE_SELECT_ACK_TRANSMIT);
+					write_simple_msg(Msg_type::ACK);
+					change_state(State::SLAVE_INFO_RECEIVE);
+				}
+				else
+				{
+					change_state(State::SLAVE_SELECT_ACK_TRANSMIT);
+					write_simple_msg(Msg_type::NAK);
+					change_state(State::NEUTRAL);
+				}
 			}
-			else
+			else if (!controller_ && (m.prefix == "bravo"))
 			{
-				change_state(State::SLAVE_SELECT_ACK_TRANSMIT);
-				write_simple_msg(Msg_type::NAK);
-				change_state(State::NEUTRAL);
+				if (accepting_input_)
+				{
+					BOOST_LOG_TRIVIAL(debug) << "accepting selection by alpha";
+					change_state(State::SLAVE_SELECT_ACK_TRANSMIT);
+					write_simple_msg(Msg_type::ACK);
+					change_state(State::SLAVE_INFO_RECEIVE);
+				}
+				else
+				{
+					change_state(State::SLAVE_SELECT_ACK_TRANSMIT);
+					write_simple_msg(Msg_type::NAK);
+					change_state(State::NEUTRAL);
+				}
+				
 			}
 		}
 		else if (m.type == Msg_type::EOT)
@@ -624,6 +657,7 @@ namespace Serial
 
 		// The checksum computation skips the first SOH or STX, but
 		// includes the ETX or EOB.
+		#if 0
 		if (cksum != compute_cksum(pos_intro + 1, pos_etx + 1))
 		{
 			BOOST_LOG_TRIVIAL(debug) << "Info message checksum error";
@@ -631,6 +665,7 @@ namespace Serial
 			msg.type = Msg_type::MALFORMED;
 			return msg;
 		}
+		#endif
 
 		// This is a valid info message
 		msg.type = Msg_type::INFO;
