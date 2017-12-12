@@ -304,10 +304,10 @@ namespace Serial
 		{
 			if (m.prefix == "bravo")
 			{
-				if (accepting_input_)
+				if (output_queue_.size() > 0)
 				{
 					change_state(State::MASTER_SELECT_TRANSMIT);
-					write_simple_msg(Msg_type::ACK);
+					write_simple_msg(Msg_type::ENQ, "alpha");
 					change_state(State::MASTER_SELECT_ACK_RECEIVE);
 				}
 				else
@@ -336,23 +336,7 @@ namespace Serial
 		// me to which I will respond with an ack.
 		if (m.type == Msg_type::ENQ)
 		{
-			if (controller_ && (m.prefix == "alpha"))
-			{
-				if (accepting_input_)
-				{
-					BOOST_LOG_TRIVIAL(debug) << "accepting selection by bravo";
-					change_state(State::SLAVE_SELECT_ACK_TRANSMIT);
-					write_simple_msg(Msg_type::ACK);
-					change_state(State::SLAVE_INFO_RECEIVE);
-				}
-				else
-				{
-					change_state(State::SLAVE_SELECT_ACK_TRANSMIT);
-					write_simple_msg(Msg_type::NAK);
-					change_state(State::NEUTRAL);
-				}
-			}
-			else if (!controller_ && (m.prefix == "bravo"))
+			if (!controller_ && (m.prefix == "bravo"))
 			{
 				if (accepting_input_)
 				{
@@ -368,6 +352,13 @@ namespace Serial
 					change_state(State::NEUTRAL);
 				}
 				
+			}
+		}
+		else if (m.type == Msg_type::ACK)
+		{
+			if (controller_ && (m.prefix == "alpha"))
+			{
+				BOOST_LOG_TRIVIAL(debug) << "slave_select_receive ACK(alpha == me) received";
 			}
 		}
 		else if (m.type == Msg_type::EOT)
